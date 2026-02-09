@@ -37,7 +37,7 @@ class bepusdt_plugin
             'appkey'  => [
                 'name' => '认证Token',
                 'type' => 'input',
-                'note' => '搭建BEpusdt时填写的 auth_token 参数',
+                'note' => 'BEpusdt后台【系统管理→基本设置→API设置→对接令牌】获取，非Docker环境变量',
             ],
             'address' => [
                 'name' => '收款地址',
@@ -63,17 +63,38 @@ class bepusdt_plugin
     {
         global $siteurl, $channel, $order, $conf;
 
+        // BEpusdt 签名规则：空值不参与签名，仅发送有值的参数以确保双方签名一致
         $parameter = [
-            'address'      => trim($channel['address']),
-            'trade_type'   => $order['typename'],
             'order_id'     => TRADE_NO,
-            'name'         => $order['name'],
-            'timeout'      => intval($channel['timeout']),
-            'rate'         => strval($channel['rate']),
-            'amount'       => $order['realmoney'],
+            'amount'       => floatval($order['realmoney']),
             'notify_url'   => $conf['localurl'] . 'pay/notify/' . TRADE_NO . '/',
             'redirect_url' => $siteurl . 'pay/return/' . TRADE_NO . '/',
         ];
+
+        $trade_type = self::_normalizeTradeType($order['typename']);
+        if ($trade_type) {
+            $parameter['trade_type'] = $trade_type;
+        }
+
+        $address = trim($channel['address'] ?? '');
+        if ($address !== '') {
+            $parameter['address'] = $address;
+        }
+
+        $name = trim($order['name'] ?? '');
+        if ($name !== '') {
+            $parameter['name'] = $name;
+        }
+
+        $timeout = intval($channel['timeout'] ?? 0);
+        if ($timeout > 0) {
+            $parameter['timeout'] = $timeout;
+        }
+
+        $rate = trim(strval($channel['rate'] ?? ''));
+        if ($rate !== '') {
+            $parameter['rate'] = $rate;
+        }
 
         $parameter['signature'] = self::_toSign($parameter, $channel['appkey']);
 
@@ -124,6 +145,17 @@ class bepusdt_plugin
         return ['type' => 'page', 'page' => 'return'];
     }
 
+    /**
+     * 将 Epay 支付方式名称转为 BEpusdt 要求的 trade_type 格式（小写+点号）
+     * 如：usdt-polygon -> usdt.polygon, USDT-TRC20 -> usdt.trc20
+     */
+    private static function _normalizeTradeType(string $typename): string
+    {
+        $t = strtolower(trim($typename));
+        $t = str_replace(['-', '_'], '.', $t);
+        return $t;
+    }
+
     private static function _toSign(array $parameter, string $token): string
     {
         ksort($parameter);
@@ -131,15 +163,15 @@ class bepusdt_plugin
         $sign = '';
 
         foreach ($parameter as $key => $val) {
-            if ($val == '') continue;
-            if ($key != 'signature') {
-                if ($sign != '') {
-                    $sign .= "&";
+            if ($key === 'signature') continue;
+            // BEpusdt 规则：空值不参与签名（包括 null、空字符串、0）
+            if ($val === '' || $val === null) continue;
+            if ($val === 0 && $key !== 'amount') continue;
 
-                }
-
-                $sign .= "$key=$val";
+            if ($sign !== '') {
+                $sign .= '&';
             }
+            $sign .= $key . '=' . $val;
         }
 
         return md5($sign . $token);
