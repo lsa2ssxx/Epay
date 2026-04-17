@@ -28,6 +28,9 @@ unset($rs);
     vertical-align: middle;
 }
 .type-logo{width: 18px;margin-top: -2px;padding-right: 4px;}
+.channel-plugin-panel { margin-bottom: 20px; }
+.channel-plugin-panel .panel-heading { font-size: 14px; }
+.channel-plugin-panel .panel-body .fixed-table-toolbar { padding: 8px 10px 0; }
 </style>
 
 <div class="modal" id="modal-store" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true" data-backdrop="static">
@@ -156,8 +159,7 @@ unset($rs);
   <a href="javascript:addframe()" class="btn btn-success"><i class="fa fa-plus"></i> 新增</a>
 </form>
 
-<table id="listTable">
-</table>
+<div id="channelTablesContainer"></div>
 
     </div>
   </div>
@@ -167,114 +169,186 @@ unset($rs);
 <script src="../assets/js/bootstrap-table-page-jump-to.min.js"></script>
 <script src="../assets/js/custom.js"></script>
 <script>
+function channelToolbarPostData() {
+	var params = {};
+	$('#searchToolbar').find(':input[name]').each(function() {
+		var n = $(this).attr('name');
+		if (n) params[n] = $(this).val();
+	});
+	return params;
+}
+function getChannelTableColumns() {
+	return [
+		{
+			field: 'id',
+			title: 'ID',
+			formatter: function(value, row, index) {
+				return '<b>'+value+'</b>';
+			}
+		},
+		{
+			field: 'name',
+			title: '显示名称'
+		},
+		{
+			field: 'mode',
+			title: '通道模式',
+			formatter: function(value, row, index) {
+				if(value == '1'){
+					return '商户直清'
+				}else{
+					return '平台代收'
+				}
+			}
+		},
+		{
+			field: 'rate',
+			title: '分成比例'
+		},
+		{
+			field: 'type',
+			title: '支付方式',
+			formatter: function(value, row, index) {
+				return '<img src="/assets/icon/'+row.typename+'.ico" class="type-logo" onerror="this.style.display=\'none\'">'+row.typeshowname;
+			}
+		},
+		{
+			field: 'plugin',
+			title: '支付插件',
+			visible: false,
+			formatter: function(value, row, index) {
+				return '<span onclick="showPlugin(\''+value+'\')" title="查看支付插件详情">'+value+'</span>';
+			}
+		},
+		{
+			field: '',
+			title: '今日笔数',
+			visible: false,
+			formatter: function(value, row, index) {
+				return '<a onclick="getAll(2,'+row.id+',this)" title="点此获取最新数据">[刷新]</a>';
+			}
+		},
+		{
+			field: '',
+			title: '昨日笔数',
+			visible: false,
+			formatter: function(value, row, index) {
+				return '<a onclick="getAll(3,'+row.id+',this)" title="点此获取最新数据">[刷新]</a>';
+			}
+		},
+		{
+			field: '',
+			title: '今日收款',
+			formatter: function(value, row, index) {
+				return '<a onclick="getAll(0,'+row.id+',this)" title="点此获取最新数据">[刷新]</a>';
+			}
+		},
+		{
+			field: '',
+			title: '昨日收款',
+			formatter: function(value, row, index) {
+				return '<a onclick="getAll(1,'+row.id+',this)" title="点此获取最新数据">[刷新]</a>';
+			}
+		},
+		{
+			field: '',
+			title: '订单成功率',
+			visible: false,
+			formatter: function(value, row, index) {
+				return '<a onclick="getSuccessRate(' + row.id +',this)" title="点此获取最新数据">[刷新]</a>';
+			}
+		},
+		{
+			field: 'status',
+			title: '状态',
+			formatter: function(value, row, index) {
+				if(value == '1'){
+					return '<a class="btn btn-xs btn-success" onclick="setStatus('+row.id+',0)">已开启</a>';
+				}else{
+					return '<a class="btn btn-xs btn-warning" onclick="setStatus('+row.id+',1)">已关闭</a>';
+				}
+			}
+		},
+		{
+			field: '',
+			title: '操作',
+			formatter: function(value, row, index) {
+				return '<a class="btn btn-xs btn-primary" onclick="editInfo('+row.id+')">配置密钥</a>&nbsp;<a class="btn btn-xs btn-info" onclick="editframe('+row.id+')">编辑</a>&nbsp;<a class="btn btn-xs btn-danger" onclick="delItem('+row.id+')">删除</a>&nbsp;<a href="./order.php?channel='+row.id+'" target="_blank" class="btn btn-xs btn-default">订单</a>&nbsp;<a onclick="copyframe('+row.id+')" class="btn btn-xs btn-default"><i class="fa fa-copy"></i></a>&nbsp;<a onclick="testpay('+row.id+')" class="btn btn-xs btn-default">测试</a>';
+			}
+		},
+	];
+}
+function destroyChannelTables() {
+	$('#channelTablesContainer').find('table[data-channel-group-table="1"]').each(function() {
+		var $t = $(this);
+		if ($t.data('bootstrap.table')) {
+			$t.bootstrapTable('destroy');
+		}
+	});
+	$('#channelTablesContainer').empty();
+}
+function loadChannelGroupedTables() {
+	var postData = channelToolbarPostData();
+	var ii = layer.load(1, {shade:[0.05,'#fff']});
+	$.ajax({
+		type: 'POST',
+		url: 'ajax_pay.php?act=channelList',
+		data: postData,
+		dataType: 'json',
+		success: function(list) {
+			layer.close(ii);
+			if (!$.isArray(list)) {
+				layer.msg('加载失败', {icon:2, time:1500});
+				return;
+			}
+			destroyChannelTables();
+			if (list.length === 0) {
+				$('#channelTablesContainer').html('<div class="alert alert-info" style="margin-top:10px">当前筛选条件下暂无支付通道。</div>');
+				return;
+			}
+			var groups = {};
+			for (var i = 0; i < list.length; i++) {
+				var p = list[i].plugin != null ? String(list[i].plugin) : '';
+				if (!groups[p]) groups[p] = [];
+				groups[p].push(list[i]);
+			}
+			var keys = Object.keys(groups);
+			keys.sort(function(a, b) {
+				if (a === '' && b !== '') return 1;
+				if (b === '' && a !== '') return -1;
+				return a.localeCompare(b);
+			});
+			for (var k = 0; k < keys.length; k++) {
+				var pluginKey = keys[k];
+				var rows = groups[pluginKey];
+				var shown = pluginKey === '' ? '（未绑定插件）' : pluginKey;
+				var safeTitle = $('<div/>').text(shown).html();
+				var panelHtml = '<div class="channel-plugin-panel panel panel-default">' +
+					'<div class="panel-heading"><strong>支付插件</strong>：' + safeTitle +
+					' <span class="text-muted">（共 '+rows.length+' 条）</span></div>' +
+					'<div class="panel-body" style="padding:0">' +
+					'<table data-channel-group-table="1" id="channelTable_'+k+'"></table>' +
+					'</div></div>';
+				$('#channelTablesContainer').append(panelHtml);
+				$('#channelTable_'+k).bootstrapTable({
+					data: rows,
+					pageNumber: 1,
+					pageSize: 15,
+					sidePagination: 'client',
+					classes: 'table table-striped table-hover table-bordered',
+					columns: getChannelTableColumns()
+				});
+			}
+		},
+		error: function() {
+			layer.close(ii);
+			layer.msg('服务器错误');
+		}
+	});
+}
 $(document).ready(function(){
 	updateToolbar();
-
-	$("#listTable").bootstrapTable({
-		url: 'ajax_pay.php?act=channelList',
-		pageNumber: 1,
-		pageSize: 15,
-        sidePagination: 'client',
-		classes: 'table table-striped table-hover table-bordered',
-		columns: [
-			{
-				field: 'id',
-				title: 'ID',
-				formatter: function(value, row, index) {
-					return '<b>'+value+'</b>';
-				}
-			},
-			{
-				field: 'name',
-				title: '显示名称'
-			},
-			{
-				field: 'mode',
-				title: '通道模式',
-				formatter: function(value, row, index) {
-					if(value == '1'){
-						return '商户直清'
-					}else{
-						return '平台代收'
-					}
-				}
-			},
-			{
-				field: 'rate',
-				title: '分成比例'
-			},
-			{
-				field: 'type',
-				title: '支付方式',
-				formatter: function(value, row, index) {
-					return '<img src="/assets/icon/'+row.typename+'.ico" class="type-logo" onerror="this.style.display=\'none\'">'+row.typeshowname;
-				}
-			},
-			{
-				field: 'plugin',
-				title: '支付插件',
-				formatter: function(value, row, index) {
-					return '<span onclick="showPlugin(\''+value+'\')" title="查看支付插件详情">'+value+'</span>';
-				}
-			},
-			{
-				field: '',
-				title: '今日笔数',
-				visible: false,
-				formatter: function(value, row, index) {
-					return '<a onclick="getAll(2,'+row.id+',this)" title="点此获取最新数据">[刷新]</a>';
-				}
-			},
-			{
-				field: '',
-				title: '昨日笔数',
-				visible: false,
-				formatter: function(value, row, index) {
-					return '<a onclick="getAll(3,'+row.id+',this)" title="点此获取最新数据">[刷新]</a>';
-				}
-			},
-			{
-				field: '',
-				title: '今日收款',
-				formatter: function(value, row, index) {
-					return '<a onclick="getAll(0,'+row.id+',this)" title="点此获取最新数据">[刷新]</a>';
-				}
-			},
-			{
-				field: '',
-				title: '昨日收款',
-				formatter: function(value, row, index) {
-					return '<a onclick="getAll(1,'+row.id+',this)" title="点此获取最新数据">[刷新]</a>';
-				}
-			},
-			{
-                field: '',
-                title: '订单成功率',
-				visible: false,
-                formatter: function(value, row, index) {
-                    return '<a onclick="getSuccessRate(' + row.id +',this)" title="点此获取最新数据">[刷新]</a>';
-                }
-            },
-			{
-				field: 'status',
-				title: '状态',
-				formatter: function(value, row, index) {
-					if(value == '1'){
-						return '<a class="btn btn-xs btn-success" onclick="setStatus('+row.id+',0)">已开启</a>';
-					}else{
-						return '<a class="btn btn-xs btn-warning" onclick="setStatus('+row.id+',1)">已关闭</a>';
-					}
-				}
-			},
-			{
-				field: '',
-				title: '操作',
-				formatter: function(value, row, index) {
-					return '<a class="btn btn-xs btn-primary" onclick="editInfo('+row.id+')">配置密钥</a>&nbsp;<a class="btn btn-xs btn-info" onclick="editframe('+row.id+')">编辑</a>&nbsp;<a class="btn btn-xs btn-danger" onclick="delItem('+row.id+')">删除</a>&nbsp;<a href="./order.php?channel='+row.id+'" target="_blank" class="btn btn-xs btn-default">订单</a>&nbsp;<a onclick="copyframe('+row.id+')" class="btn btn-xs btn-default"><i class="fa fa-copy"></i></a>&nbsp;<a onclick="testpay('+row.id+')" class="btn btn-xs btn-default">测试</a>';
-				}
-			},
-		],
-	})
+	loadChannelGroupedTables();
 })
 
 function changeType(plugin){
@@ -626,6 +700,19 @@ function testpay(id) {
 			});
 		}
 	});
+}
+function searchSubmit() {
+	loadChannelGroupedTables();
+	return false;
+}
+function searchClear() {
+	$('#searchToolbar').find('input[name]').each(function() {
+		$(this).val('');
+	});
+	$('#searchToolbar').find('select[name]').each(function() {
+		$(this).find('option:first').prop("selected", 'selected');
+	});
+	loadChannelGroupedTables();
 }
 $(function () {
   $('[data-toggle="popover"]').popover()
