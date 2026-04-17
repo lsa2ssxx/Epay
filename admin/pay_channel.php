@@ -338,8 +338,8 @@ function loadChannelGroupedTables() {
 					classes: 'table table-striped table-hover table-bordered',
 					columns: getChannelTableColumns(),
 					toolbar: false,
-					showColumns: false,
-					showFullscreen: false,
+					showColumns: true,
+					showFullscreen: true,
 					search: false
 				});
 			}
