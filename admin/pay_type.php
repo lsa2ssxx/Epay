@@ -11,6 +11,9 @@ if($islogin==1){}else exit("<script language='javascript'>window.location.href='
 .type-logo{width: 18px;margin-top: -2px;padding-right: 4px;}
 .type-plugin-panel{margin-bottom:16px;}
 .type-plugin-panel .panel-heading{font-size:14px;}
+.type-plugin-related summary{cursor:pointer;outline:none;}
+.type-plugin-related summary::-webkit-details-marker{display:none;}
+.type-plugin-related ul{list-style:none;}
 </style>
   <div class="container" style="padding-top:70px;">
     <div class="col-md-8 center-block" style="float: none;">
@@ -28,13 +31,30 @@ function pay_type_render_rows($rows){
 	foreach($rows as $res){
 		$pluginNote = '';
 		if(!empty($res['_plugins'])){
-			$bits = [];
-			foreach($res['_plugins'] as $z){
-				$sn = htmlspecialchars($z['showname'] ?? '', ENT_QUOTES, 'UTF-8');
-				$nm = htmlspecialchars($z['name'], ENT_QUOTES, 'UTF-8');
-				$bits[] = $sn.'（'.$nm.'）';
+			$pl = $res['_plugins'];
+			usort($pl, function($a, $b){
+				$sa = $a['showname'] ?? $a['name'];
+				$sb = $b['showname'] ?? $b['name'];
+				return strcasecmp($sa, $sb);
+			});
+			$n = count($pl);
+			if($n <= 4){
+				$bits = [];
+				foreach($pl as $z){
+					$sn = htmlspecialchars($z['showname'] ?? '', ENT_QUOTES, 'UTF-8');
+					$nm = htmlspecialchars($z['name'], ENT_QUOTES, 'UTF-8');
+					$bits[] = $sn.'（'.$nm.'）';
+				}
+				$pluginNote = '<div class="text-muted" style="font-size:12px;margin-top:4px">关联插件：'.implode('、', $bits).'</div>';
+			}else{
+				$lis = '';
+				foreach($pl as $z){
+					$sn = htmlspecialchars($z['showname'] ?? '', ENT_QUOTES, 'UTF-8');
+					$nm = htmlspecialchars($z['name'], ENT_QUOTES, 'UTF-8');
+					$lis .= '<li style="margin:3px 0">'.$sn.' <span class="text-muted">（'.$nm.'）</span></li>';
+				}
+				$pluginNote = '<details class="type-plugin-related text-muted" style="margin-top:4px;font-size:12px"><summary>关联插件（共 <strong>'.(int)$n.'</strong> 个）<span class="text-info">点击展开</span></summary><ul style="margin:8px 0 0;padding:6px 8px 6px 10px;max-height:11em;overflow-y:auto;border-left:3px solid #bce8f1;background:#f9f9f9">'.$lis.'</ul></details>';
 			}
-			$pluginNote = '<div class="text-muted" style="font-size:12px;margin-top:4px">关联插件：'.implode('、', $bits).'</div>';
 		}
 		$nameDisp = htmlspecialchars($res['name'], ENT_QUOTES, 'UTF-8');
 		$shownameDisp = htmlspecialchars($res['showname'], ENT_QUOTES, 'UTF-8');
