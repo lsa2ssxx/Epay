@@ -9,6 +9,8 @@ if($islogin==1){}else exit("<script language='javascript'>window.location.href='
 ?>
 <style>
 .type-logo{width: 18px;margin-top: -2px;padding-right: 4px;}
+.type-plugin-panel{margin-bottom:16px;}
+.type-plugin-panel .panel-heading{font-size:14px;}
 </style>
   <div class="container" style="padding-top:70px;">
     <div class="col-md-8 center-block" style="float: none;">
@@ -22,7 +24,62 @@ function display_device($device){
 		return 'PC+Mobile';
 }
 
+function pay_type_render_rows($rows){
+	foreach($rows as $res){
+		$pluginNote = '';
+		if(!empty($res['_plugins'])){
+			$bits = [];
+			foreach($res['_plugins'] as $z){
+				$sn = htmlspecialchars($z['showname'] ?? '', ENT_QUOTES, 'UTF-8');
+				$nm = htmlspecialchars($z['name'], ENT_QUOTES, 'UTF-8');
+				$bits[] = $sn.'（'.$nm.'）';
+			}
+			$pluginNote = '<div class="text-muted" style="font-size:12px;margin-top:4px">关联插件：'.implode('、', $bits).'</div>';
+		}
+		$nameDisp = htmlspecialchars($res['name'], ENT_QUOTES, 'UTF-8');
+		$shownameDisp = htmlspecialchars($res['showname'], ENT_QUOTES, 'UTF-8');
+		$iconName = $res['name'];
+		echo '<tr><td><b>'.$nameDisp.'</b></td><td><img src="/assets/icon/'.$iconName.'.ico" class="type-logo" onerror="this.style.display=\'none\'">'.$shownameDisp.$pluginNote.'</td><td>'.display_device($res['device']).'</td><td><a onclick="getAll(0,'.$res['id'].',this)" title="点此获取最新数据">[刷新]</a></td><td>'.($res['status']==1?'<a class="btn btn-xs btn-success" onclick="setStatus('.$res['id'].',0)">已开启</a>':'<a class="btn btn-xs btn-warning" onclick="setStatus('.$res['id'].',1)">已关闭</a>').'</td><td><a class="btn btn-xs btn-info" onclick="editframe('.$res['id'].')">编辑</a>&nbsp;<a class="btn btn-xs btn-danger" onclick="delItem('.$res['id'].')">删除</a>&nbsp;<a href="./order.php?type='.$res['id'].'" target="_blank" class="btn btn-xs btn-default">订单</a></td></tr>';
+	}
+}
+
 $list = $DB->getAll("SELECT * FROM pre_type ORDER BY id ASC");
+$plugins = \lib\Plugin::getAll();
+$typeToPlugins = [];
+foreach($plugins as $p){
+	$typesStr = isset($p['types']) ? (string)$p['types'] : '';
+	$tokens = array_unique(array_filter(array_map('trim', explode(',', $typesStr))));
+	foreach($tokens as $t){
+		if($t === '')continue;
+		if(!isset($typeToPlugins[$t]))$typeToPlugins[$t] = [];
+		$typeToPlugins[$t][$p['name']] = [
+			'name' => $p['name'],
+			'showname' => ($p['showname'] !== null && $p['showname'] !== '') ? $p['showname'] : $p['name'],
+		];
+	}
+}
+$bucket_common = [];
+$bucket_by_plugin = [];
+$bucket_other = [];
+foreach($list as $res){
+	$n = $res['name'];
+	$pmap = isset($typeToPlugins[$n]) ? $typeToPlugins[$n] : [];
+	$plist = array_values($pmap);
+	$cnt = count($plist);
+	if($cnt >= 2){
+		$res['_plugins'] = $plist;
+		$bucket_common[] = $res;
+	}elseif($cnt === 1){
+		$pn = $plist[0]['name'];
+		if(!isset($bucket_by_plugin[$pn])){
+			$bucket_by_plugin[$pn] = ['meta' => $plist[0], 'rows' => []];
+		}
+		$bucket_by_plugin[$pn]['rows'][] = $res;
+	}else{
+		$bucket_other[] = $res;
+	}
+}
+ksort($bucket_by_plugin);
 ?>
 <div class="modal" id="modal-store" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true" data-backdrop="static">
 	<div class="modal-dialog">
@@ -78,21 +135,29 @@ $list = $DB->getAll("SELECT * FROM pre_type ORDER BY id ASC");
 </div>
 
 <div class="panel panel-info">
-   <div class="panel-heading"><h3 class="panel-title">系统共有 <b><?php echo count($list);?></b> 个支付方式&nbsp;<span class="pull-right"><a href="javascript:addframe()" class="btn btn-default btn-xs"><i class="fa fa-plus"></i> 新增</a></span></h3></div>
-      <div class="table-responsive">
-        <table class="table table-striped">
-          <thead><tr><th>调用值</th><th>名称</th><th>支持设备</th><th>今日收款</th><th>状态</th><th>操作</th></tr></thead>
-          <tbody>
+   <div class="panel-heading"><h3 class="panel-title">系统共有 <b><?php echo count($list);?></b> 个支付方式（按支付插件归类）&nbsp;<span class="pull-right"><a href="javascript:addframe()" class="btn btn-default btn-xs"><i class="fa fa-plus"></i> 新增</a></span></h3></div>
+</div>
 <?php
-foreach($list as $res)
-{
-echo '<tr><td><b>'.$res['name'].'</b></td><td><img src="/assets/icon/'.$res['name'].'.ico" class="type-logo" onerror="this.style.display=\'none\'">'.$res['showname'].'</td><td>'.display_device($res['device']).'</td><td><a onclick="getAll(0,'.$res['id'].',this)" title="点此获取最新数据">[刷新]</a></td><td>'.($res['status']==1?'<a class="btn btn-xs btn-success" onclick="setStatus('.$res['id'].',0)">已开启</a>':'<a class="btn btn-xs btn-warning" onclick="setStatus('.$res['id'].',1)">已关闭</a>').'</td><td><a class="btn btn-xs btn-info" onclick="editframe('.$res['id'].')">编辑</a>&nbsp;<a class="btn btn-xs btn-danger" onclick="delItem('.$res['id'].')">删除</a>&nbsp;<a href="./order.php?type='.$res['id'].'" target="_blank" class="btn btn-xs btn-default">订单</a></td></tr>';
+$tableHead = '<div class="table-responsive"><table class="table table-striped"><thead><tr><th>调用值</th><th>名称</th><th>支持设备</th><th>今日收款</th><th>状态</th><th>操作</th></tr></thead><tbody>';
+$tableFoot = '</tbody></table></div>';
+if(count($bucket_common) > 0){
+	echo '<div class="panel panel-default type-plugin-panel"><div class="panel-heading"><strong>通用支付方式</strong>（被 2 个及以上支付插件声明）</div><div class="panel-body" style="padding:0">'.$tableHead;
+	pay_type_render_rows($bucket_common);
+	echo $tableFoot.'</div></div>';
+}
+foreach($bucket_by_plugin as $pack){
+	$meta = $pack['meta'];
+	$title = htmlspecialchars($meta['showname'], ENT_QUOTES, 'UTF-8').' <span class="text-muted">（'.htmlspecialchars($meta['name'], ENT_QUOTES, 'UTF-8').'）</span>';
+	echo '<div class="panel panel-default type-plugin-panel"><div class="panel-heading"><strong>'.$title.'</strong></div><div class="panel-body" style="padding:0">'.$tableHead;
+	pay_type_render_rows($pack['rows']);
+	echo $tableFoot.'</div></div>';
+}
+if(count($bucket_other) > 0){
+	echo '<div class="panel panel-default type-plugin-panel"><div class="panel-heading"><strong>其他</strong>（未在任何支付插件的声明类型中出现）</div><div class="panel-body" style="padding:0">'.$tableHead;
+	pay_type_render_rows($bucket_other);
+	echo $tableFoot.'</div></div>';
 }
 ?>
-          </tbody>
-        </table>
-      </div>
-	</div>
     </div>
   </div>
 <script src="<?php echo $cdnpublic?>layer/3.1.1/layer.js"></script>
