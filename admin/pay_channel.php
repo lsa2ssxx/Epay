@@ -156,6 +156,7 @@ unset($rs);
   </div>
   <button type="submit" class="btn btn-primary"><i class="fa fa-search"></i> 搜索</button>
   <a href="javascript:searchClear()" class="btn btn-default"><i class="fa fa-refresh"></i> 重置</a>
+  <a href="javascript:openBepusdtBatchImport()" class="btn btn-info"><i class="fa fa-upload"></i> 批量导入 BEpusdt 通道</a>
   <a href="javascript:addframe()" class="btn btn-success"><i class="fa fa-plus"></i> 新增</a>
 </form>
 
@@ -721,4 +722,102 @@ function searchClear() {
 $(function () {
   $('[data-toggle="popover"]').popover()
 })
+
+function openBepusdtBatchImport(){
+	var sample = JSON.stringify([
+		{
+			"name":"BEpusdt-USDT-TRC20-1",
+			"type":"usdt.trc20",
+			"rate":"100",
+			"costrate":"",
+			"mode":0,
+			"daytop":0,
+			"daymaxorder":0,
+			"paymin":"",
+			"paymax":"",
+			"timestart":"",
+			"timestop":"",
+			"config":{
+				"appurl":"https://bepusdt.example.com/",
+				"appkey":"your-token-here",
+				"address":"",
+				"timeout":"1200",
+				"rate":""
+			}
+		}
+	], null, 2);
+	var content = '<div style="padding:15px 15px 5px 15px;">'
+		+ '<div class="alert alert-info" style="margin-bottom:10px;line-height:1.7">'
+		+ '<b>说明：</b>粘贴 JSON 数组，每个对象生成 1 条支付通道（插件固定为 <code>bepusdt</code>）。<br>'
+		+ '<b>去重规则：</b>通道显示名称 <code>name</code> 已存在则跳过。<br>'
+		+ '<b>type</b> 填支付方式调用值（如 <code>usdt.trc20</code>），需已在“支付方式”中存在。'
+		+ '</div>'
+		+ '<textarea id="bepusdtImportJson" class="form-control" rows="16" style="font-family:monospace"></textarea>'
+		+ '<div style="margin-top:10px" class="text-right">'
+		+ '<button type="button" class="btn btn-default" onclick="$(\'#bepusdtImportJson\').val(sampleBepusdtImportJson)">填充示例</button> '
+		+ '<button type="button" class="btn btn-primary" onclick="doBepusdtBatchImport()">开始导入</button>'
+		+ '</div>'
+		+ '</div>';
+
+	window.sampleBepusdtImportJson = sample;
+	var area = [$(window).width() > 820 ? '820px' : '100%', $(window).height() > 720 ? '640px' : '100%'];
+	layer.open({
+		type: 1,
+		area: area,
+		title: '批量导入 BEpusdt 支付通道',
+		shadeClose: true,
+		content: content,
+		success: function(){
+			$('#bepusdtImportJson').val(sample);
+		}
+	});
+}
+
+function doBepusdtBatchImport(){
+	var raw = ($('#bepusdtImportJson').val() || '').trim();
+	if(!raw){
+		layer.alert('请粘贴 JSON 内容', {icon:2});
+		return;
+	}
+	var payload = null;
+	try{
+		payload = JSON.parse(raw);
+	}catch(e){
+		layer.alert('JSON 解析失败：' + (e && e.message ? e.message : '未知错误'), {icon:2});
+		return;
+	}
+	if(!$.isArray(payload)){
+		layer.alert('格式错误：根节点必须是 JSON 数组', {icon:2});
+		return;
+	}
+	var ii = layer.load(2, {shade:[0.1,'#fff']});
+	$.ajax({
+		type: 'POST',
+		url: 'ajax_pay.php?act=importBepusdtChannels',
+		data: {list: raw},
+		dataType: 'json',
+		success: function(data){
+			layer.close(ii);
+			if(data && data.code === 0){
+				var msg = '导入完成：新增 <b>'+data.imported+'</b> 条，跳过（已存在）<b>'+data.skipped+'</b> 条';
+				if(data.failed > 0){
+					msg += '，失败 <b>'+data.failed+'</b> 条';
+				}
+				if(data.errors && data.errors.length){
+					msg += '<br><br><b>失败原因（最多展示前 10 条）：</b><br>' + data.errors.join('<br>');
+				}
+				layer.alert(msg, {icon:1, closeBtn:false}, function(){
+					layer.closeAll();
+					loadChannelGroupedTables();
+				});
+			}else{
+				layer.alert((data && data.msg) ? data.msg : '导入失败', {icon:2});
+			}
+		},
+		error: function(){
+			layer.close(ii);
+			layer.msg('服务器错误');
+		}
+	});
+}
 </script>

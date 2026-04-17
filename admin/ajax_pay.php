@@ -124,6 +124,150 @@ case 'importBepusdtPayTypes':
 	$total = count($rows);
 	exit(json_encode(['code'=>0,'msg'=>'导入完成','imported'=>$imported,'skipped'=>$skipped,'total'=>$total], JSON_UNESCAPED_UNICODE));
 break;
+case 'importBepusdtChannels':
+	// 批量导入 BEpusdt 支付通道（pre_channel）
+	// 输入：POST list=JSON字符串（数组），每项包含 name/type/rate/.../config
+	$raw = isset($_POST['list']) ? trim($_POST['list']) : '';
+	if($raw === '') exit('{"code":-1,"msg":"参数不能为空"}');
+
+	$list = json_decode($raw, true);
+	if(!is_array($list)) exit('{"code":-1,"msg":"JSON解析失败或格式不正确（必须是数组）"}');
+
+	$imported = 0;
+	$skipped = 0;
+	$failed = 0;
+	$errors = [];
+
+	$pluginName = 'bepusdt';
+	$pluginCfg = \lib\Plugin::getConfig($pluginName);
+	if(!$pluginCfg || empty($pluginCfg['inputs'])){
+		exit('{"code":-1,"msg":"BEpusdt 插件不存在或未声明 inputs"}');
+	}
+	$inputKeys = array_keys($pluginCfg['inputs']);
+
+	foreach($list as $idx => $item){
+		if(!is_array($item)){
+			$failed++;
+			if(count($errors) < 10) $errors[] = '第'.($idx+1).'条：不是对象';
+			continue;
+		}
+
+		$name = isset($item['name']) ? trim((string)$item['name']) : '';
+		$typeName = isset($item['type']) ? trim((string)$item['type']) : '';
+		if($name === '' || $typeName === ''){
+			$failed++;
+			if(count($errors) < 10) $errors[] = '第'.($idx+1).'条：name/type 不能为空';
+			continue;
+		}
+		if(mb_strlen($name) > 30){
+			$failed++;
+			if(count($errors) < 10) $errors[] = '第'.($idx+1).'条：name 长度不能超过30';
+			continue;
+		}
+		if(!preg_match('/^[a-zA-Z0-9_.]+$/', $typeName)){
+			$failed++;
+			if(count($errors) < 10) $errors[] = '第'.($idx+1).'条：type 格式不合法（仅允许字母数字下划线点）';
+			continue;
+		}
+
+		// 支付通道名称全局唯一（与 saveChannel 的规则一致）
+		$exist = $DB->getRow('SELECT id FROM pre_channel WHERE name=:name LIMIT 1', [':name'=>$name]);
+		if($exist){
+			$skipped++;
+			continue;
+		}
+
+		// type -> pre_type.id （默认使用 device=0 的调用值）
+		$typeRow = $DB->getRow('SELECT id FROM pre_type WHERE name=:name AND device=0 LIMIT 1', [':name'=>$typeName]);
+		if(!$typeRow){
+			$failed++;
+			if(count($errors) < 10) $errors[] = '第'.($idx+1).'条：支付方式不存在（请先导入/创建 '.$typeName.'）';
+			continue;
+		}
+
+		$mode = isset($item['mode']) ? intval($item['mode']) : 0;
+		$rate = isset($item['rate']) ? trim((string)$item['rate']) : '';
+		$costrate = isset($item['costrate']) ? trim((string)$item['costrate']) : '';
+		$daytop = isset($item['daytop']) ? intval($item['daytop']) : 0;
+		$daymaxorder = isset($item['daymaxorder']) ? intval($item['daymaxorder']) : 0;
+		$paymin = isset($item['paymin']) ? trim((string)$item['paymin']) : '';
+		$paymax = isset($item['paymax']) ? trim((string)$item['paymax']) : '';
+		$timestart = isset($item['timestart']) ? trim((string)$item['timestart']) : '';
+		$timestop = isset($item['timestop']) ? trim((string)$item['timestop']) : '';
+
+		if($rate === '') $rate = '100';
+		if(!preg_match('/^[0-9.]+$/', $rate)){
+			$failed++;
+			if(count($errors) < 10) $errors[] = '第'.($idx+1).'条：rate 不合法';
+			continue;
+		}
+		if($costrate !== '' && !preg_match('/^[0-9.]+$/', $costrate)){
+			$failed++;
+			if(count($errors) < 10) $errors[] = '第'.($idx+1).'条：costrate 不合法';
+			continue;
+		}
+		if($paymin !== '' && !preg_match('/^[0-9.]+$/', $paymin)){
+			$failed++;
+			if(count($errors) < 10) $errors[] = '第'.($idx+1).'条：paymin 不合法';
+			continue;
+		}
+		if($paymax !== '' && !preg_match('/^[0-9.]+$/', $paymax)){
+			$failed++;
+			if(count($errors) < 10) $errors[] = '第'.($idx+1).'条：paymax 不合法';
+			continue;
+		}
+
+		$config = isset($item['config']) && is_array($item['config']) ? $item['config'] : [];
+		$cfg = [];
+		foreach($inputKeys as $k){
+			if(array_key_exists($k, $config)){
+				$cfg[$k] = is_array($config[$k]) ? $config[$k] : trim((string)$config[$k]);
+			}else{
+				$cfg[$k] = '';
+			}
+		}
+		$appurl = trim((string)($cfg['appurl'] ?? ''));
+		$appkey = trim((string)($cfg['appkey'] ?? ''));
+		if($appurl === '' || $appkey === ''){
+			$failed++;
+			if(count($errors) < 10) $errors[] = '第'.($idx+1).'条：config.appurl/config.appkey 不能为空';
+			continue;
+		}
+		if(!preg_match('#^https?://#i', $appurl)){
+			$failed++;
+			if(count($errors) < 10) $errors[] = '第'.($idx+1).'条：config.appurl 必须以 http(s):// 开头';
+			continue;
+		}
+		if(substr($appurl, -1) !== '/'){
+			$appurl .= '/';
+			$cfg['appurl'] = $appurl;
+		}
+
+		$data = [
+			'name' => $name,
+			'rate' => $rate,
+			'costrate' => $costrate,
+			'mode' => $mode,
+			'type' => intval($typeRow['id']),
+			'plugin' => $pluginName,
+			'daytop' => $daytop,
+			'paymin' => $paymin,
+			'paymax' => $paymax,
+			'daymaxorder' => $daymaxorder,
+			'timestart' => $timestart === '' ? null : intval($timestart),
+			'timestop' => $timestop === '' ? null : intval($timestop),
+			'config' => json_encode($cfg, JSON_UNESCAPED_UNICODE),
+			'status' => 0,
+		];
+		if($DB->insert('channel', $data)){
+			$imported++;
+		}else{
+			$failed++;
+			if(count($errors) < 10) $errors[] = '第'.($idx+1).'条：写入数据库失败['.$DB->error().']';
+		}
+	}
+	exit(json_encode(['code'=>0,'msg'=>'导入完成','imported'=>$imported,'skipped'=>$skipped,'failed'=>$failed,'errors'=>$errors], JSON_UNESCAPED_UNICODE));
+break;
 case 'getPlugin':
 	$name = trim($_GET['name']);
 	$row=$DB->getRow("SELECT * FROM pre_plugin WHERE name='$name'");
