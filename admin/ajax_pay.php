@@ -94,6 +94,36 @@ case 'savePayType':
 		else exit('{"code":-1,"msg":"修改支付方式失败['.$DB->error().']"}');
 	}
 break;
+case 'importBepusdtPayTypes':
+	$pluginFile = PLUGIN_ROOT.'bepusdt/bepusdt_plugin.php';
+	if(!file_exists($pluginFile))
+		exit('{"code":-1,"msg":"BEpusdt 插件不存在"}');
+	require_once $pluginFile;
+	if(!class_exists('bepusdt_plugin', false) || !method_exists('bepusdt_plugin', 'tradeTypeCatalog'))
+		exit('{"code":-1,"msg":"BEpusdt 插件不完整"}');
+	$rows = bepusdt_plugin::tradeTypeCatalog();
+	$device = 0;
+	$imported = 0;
+	$skipped = 0;
+	foreach($rows as $r){
+		$name = isset($r['name']) ? trim($r['name']) : '';
+		$showname = isset($r['showname']) ? trim($r['showname']) : '';
+		if($name === '' || $showname === '')
+			continue;
+		if(!preg_match('/^[a-zA-Z0-9_.]+$/', $name))
+			continue;
+		$exist = $DB->getRow('SELECT id FROM pre_type WHERE name=:name AND device=:device LIMIT 1', [':name'=>$name, ':device'=>$device]);
+		if($exist){
+			$skipped++;
+			continue;
+		}
+		if($DB->insert('type', ['name'=>$name, 'device'=>$device, 'showname'=>$showname, 'status'=>1]))
+			$imported++;
+	}
+	\lib\Plugin::updateAll();
+	$total = count($rows);
+	exit(json_encode(['code'=>0,'msg'=>'导入完成','imported'=>$imported,'skipped'=>$skipped,'total'=>$total], JSON_UNESCAPED_UNICODE));
+break;
 case 'getPlugin':
 	$name = trim($_GET['name']);
 	$row=$DB->getRow("SELECT * FROM pre_plugin WHERE name='$name'");

@@ -7,27 +7,8 @@ class bepusdt_plugin
         'showname' => 'BEpusdt USDT/USDC 个人收款',
         'author'   => 'V03413',
         'link'     => 'https://github.com/v03413/BEpusdt',
-        'types'    => [
-            // 此列表可能存在变动，以此为准 https://github.com/v03413/BEpusdt/blob/main/docs/trade-type.md
-            'tron.trx',
-            'usdt.trc20',
-            'usdc.trc20',
-            'usdt.polygon',
-            'usdc.polygon',
-            'usdt.arbitrum',
-            'usdc.arbitrum',
-            'usdt.erc20',
-            'usdc.erc20',
-            'usdt.bep20',
-            'usdc.bep20',
-            'usdt.xlayer',
-            'usdc.xlayer',
-            'usdc.base',
-            'usdt.solana',
-            'usdc.solana',
-            'usdt.aptos',
-            'usdc.aptos',
-        ],
+        // 与 tradeTypeCatalog() 同步；权威列表见 https://github.com/v03413/BEpusdt/blob/main/docs/trade-type.md
+        'types'    => [],
         'inputs'   => [
             'appurl'  => [
                 'name' => '接口地址',
@@ -58,6 +39,39 @@ class bepusdt_plugin
         'select'   => null,
         'note'     => '', //支付密钥填写说明
     ];
+
+    /**
+     * BEpusdt API trade_type 与 Epay 支付方式展示名（用于后台一键导入）。
+     * 顺序与官方文档表格一致，便于对照维护。
+     *
+     * @return array<int, array{name:string, showname:string}>
+     */
+    public static function tradeTypeCatalog(): array
+    {
+        return [
+            ['name' => 'usdt.trc20', 'showname' => 'USDT-TRC20'],
+            ['name' => 'usdc.trc20', 'showname' => 'USDC-TRC20'],
+            ['name' => 'tron.trx', 'showname' => 'TRX'],
+            ['name' => 'usdt.erc20', 'showname' => 'USDT-ERC20'],
+            ['name' => 'usdc.erc20', 'showname' => 'USDC-ERC20'],
+            ['name' => 'ethereum.eth', 'showname' => 'ETH'],
+            ['name' => 'usdt.polygon', 'showname' => 'USDT-Polygon'],
+            ['name' => 'usdc.polygon', 'showname' => 'USDC-Polygon'],
+            ['name' => 'usdt.bep20', 'showname' => 'USDT-BEP20'],
+            ['name' => 'usdc.bep20', 'showname' => 'USDC-BEP20'],
+            ['name' => 'bsc.bnb', 'showname' => 'BNB'],
+            ['name' => 'usdt.aptos', 'showname' => 'USDT-Aptos'],
+            ['name' => 'usdc.aptos', 'showname' => 'USDC-Aptos'],
+            ['name' => 'usdt.solana', 'showname' => 'USDT-Solana'],
+            ['name' => 'usdc.solana', 'showname' => 'USDC-Solana'],
+            ['name' => 'usdt.xlayer', 'showname' => 'USDT-X Layer'],
+            ['name' => 'usdc.xlayer', 'showname' => 'USDC-X Layer'],
+            ['name' => 'usdt.arbitrum', 'showname' => 'USDT-Arbitrum'],
+            ['name' => 'usdc.arbitrum', 'showname' => 'USDC-Arbitrum'],
+            ['name' => 'usdc.base', 'showname' => 'USDC-Base'],
+            ['name' => 'usdt.plasma', 'showname' => 'USDT-Plasma'],
+        ];
+    }
 
     public static function submit(): array
     {
@@ -201,3 +215,5 @@ class bepusdt_plugin
         return json_decode($resp, true);
     }
 }
+
+bepusdt_plugin::$info['types'] = array_column(bepusdt_plugin::tradeTypeCatalog(), 'name');

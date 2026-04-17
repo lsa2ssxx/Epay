@@ -168,7 +168,11 @@ if(count($bucket_common) > 0){
 foreach($bucket_by_plugin as $pack){
 	$meta = $pack['meta'];
 	$title = htmlspecialchars($meta['showname'], ENT_QUOTES, 'UTF-8').' <span class="text-muted">（'.htmlspecialchars($meta['name'], ENT_QUOTES, 'UTF-8').'）</span>';
-	echo '<div class="panel panel-default type-plugin-panel"><div class="panel-heading"><strong>'.$title.'</strong></div><div class="panel-body" style="padding:0">'.$tableHead;
+	$bepusdtImport = '';
+	if(($meta['name'] ?? '') === 'bepusdt'){
+		$bepusdtImport = '<span class="pull-right" style="margin-top:-2px"><button type="button" class="btn btn-xs btn-primary" onclick="importBepusdtPayTypes()"><i class="fa fa-plus-circle"></i> 一键导入全部交易类型</button></span>';
+	}
+	echo '<div class="panel panel-default type-plugin-panel"><div class="panel-heading clearfix"><strong>'.$title.'</strong>'.$bepusdtImport.'</div><div class="panel-body" style="padding:0">'.$tableHead;
 	pay_type_render_rows($pack['rows']);
 	echo $tableFoot.'</div></div>';
 }
@@ -290,6 +294,35 @@ function setStatus(id,status) {
 			layer.msg('服务器错误');
 			return false;
 		}
+	});
+}
+function importBepusdtPayTypes(){
+	layer.confirm('将按 BEpusdt 官方文档（trade_type）在数据库中批量注册支付方式；调用值 + 设备（PC+Mobile）已存在的条目将自动跳过。是否继续？', {
+		btn: ['确定','取消'], title: '导入 BEpusdt 交易类型', icon: 3
+	}, function(){
+		var ii = layer.load(2, {shade:[0.1,'#fff']});
+		$.ajax({
+			type : 'GET',
+			url : 'ajax_pay.php?act=importBepusdtPayTypes',
+			dataType : 'json',
+			success : function(data) {
+				layer.close(ii);
+				if(data.code == 0){
+					layer.alert('导入完成：新增 <b>'+data.imported+'</b> 条，跳过（已存在）<b>'+data.skipped+'</b> 条；目录共 <b>'+data.total+'</b> 项。已同步刷新插件注册表。', {
+						icon: 1,
+						closeBtn: false
+					}, function(){
+						window.location.reload();
+					});
+				}else{
+					layer.alert(data.msg || '导入失败', {icon: 2});
+				}
+			},
+			error:function(){
+				layer.close(ii);
+				layer.msg('服务器错误');
+			}
+		});
 	});
 }
 function getAll(type, typeid, obj){
