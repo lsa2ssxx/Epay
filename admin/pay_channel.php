@@ -336,7 +336,11 @@ function loadChannelGroupedTables() {
 					pageSize: 15,
 					sidePagination: 'client',
 					classes: 'table table-striped table-hover table-bordered',
-					columns: getChannelTableColumns()
+					columns: getChannelTableColumns(),
+					toolbar: false,
+					showColumns: false,
+					showFullscreen: false,
+					search: false
 				});
 			}
 		},
