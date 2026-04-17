@@ -138,12 +138,29 @@ case 'getPlugins':
 	$type=$DB->getColumn("SELECT name FROM pre_type WHERE id='$typeid'");
 	if(!$type)
 		exit('{"code":-1,"msg":"当前支付方式不存在！"}');
-	$list=$DB->getAll("SELECT name,showname FROM pre_plugin WHERE types LIKE '%$type%' ORDER BY name ASC");
-	if($list){
-		$result = ['code'=>0,'msg'=>'succ','data'=>$list];
-		exit(json_encode($result));
+	$list = [];
+	foreach(\lib\Plugin::getList() as $pn){
+		if(!$pn) continue;
+		$cfg = \lib\Plugin::getConfig($pn);
+		if(!$cfg || empty($cfg['name'])) continue;
+		$types = $cfg['types'] ?? [];
+		if(!is_array($types)){
+			$types = explode(',', (string)$types);
+		}
+		$types = array_unique(array_filter(array_map('trim', $types)));
+		if(in_array($type, $types, true)){
+			$list[] = [
+				'name' => $cfg['name'],
+				'showname' => (!empty($cfg['showname'])) ? $cfg['showname'] : $cfg['name'],
+			];
+		}
 	}
-	else exit('{"code":-1,"msg":"没有找到支持该支付方式的插件"}');
+	if($list){
+		usort($list, function($a, $b){ return strcasecmp($a['name'], $b['name']); });
+		$result = ['code'=>0,'msg'=>'succ','data'=>$list];
+		exit(json_encode($result, JSON_UNESCAPED_UNICODE));
+	}
+	else exit('{"code":-1,"msg":"没有找到支持该支付方式的插件（请确认插件目录存在且插件声明了 types）"}');
 break;
 case 'getChannel':
 	$id=intval($_GET['id']);
