@@ -64,17 +64,35 @@ function pay_type_render_rows($rows){
 }
 
 $list = $DB->getAll("SELECT * FROM pre_type ORDER BY id ASC");
-$plugins = \lib\Plugin::getAll();
+$plugins = [];
+foreach(\lib\Plugin::getList() as $pn){
+	if(!$pn) continue;
+	$cfg = \lib\Plugin::getConfig($pn);
+	if(!$cfg || empty($cfg['name'])) continue;
+	$plugins[] = [
+		'name' => $cfg['name'],
+		'showname' => $cfg['showname'] ?? $cfg['name'],
+		'types' => $cfg['types'] ?? null,
+	];
+}
 $typeToPlugins = [];
 foreach($plugins as $p){
-	$typesStr = isset($p['types']) ? (string)$p['types'] : '';
-	$tokens = array_unique(array_filter(array_map('trim', explode(',', $typesStr))));
+	$tokens = [];
+	if(isset($p['types'])){
+		if(is_array($p['types'])){
+			$tokens = $p['types'];
+		}else{
+			$typesStr = (string)$p['types'];
+			$tokens = explode(',', $typesStr);
+		}
+	}
+	$tokens = array_unique(array_filter(array_map('trim', $tokens)));
 	foreach($tokens as $t){
 		if($t === '')continue;
 		if(!isset($typeToPlugins[$t]))$typeToPlugins[$t] = [];
 		$typeToPlugins[$t][$p['name']] = [
 			'name' => $p['name'],
-			'showname' => ($p['showname'] !== null && $p['showname'] !== '') ? $p['showname'] : $p['name'],
+			'showname' => (!empty($p['showname'])) ? $p['showname'] : $p['name'],
 		];
 	}
 }
