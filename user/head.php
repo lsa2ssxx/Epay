@@ -29,6 +29,7 @@ $conf = array_merge($conf, $groupconfig);
   <link rel="stylesheet" href="./assets/css/font.css" type="text/css" />
   <link rel="stylesheet" href="./assets/css/app.css" type="text/css" />
   <link rel="stylesheet" href="../assets/css/bootstrap-table.css?v=1"/>
+  <link rel="stylesheet" href="../assets/css/pay-type-icon.css"/>
 </head>
 <body>
 <div class="app app-header-fixed  ">

@@ -253,7 +253,7 @@ $(document).ready(function(){
 			$('#transfer_today_all').html(data.transfer_today_all);
 			$('#transfer_lastday_all').html(data.transfer_lastday_all);
 			$.each(data.channels, function (i, item) {
-				$('#paytypes').append('<th style="text-align:center;"><img src="/assets/icon/'+item.name+'.ico" width="18px">&nbsp;'+item.showname+'</th>');
+				$('#paytypes').append('<th style="text-align:center;">'+(typeof payTypeIconHtml === 'function' ? payTypeIconHtml(item.name, 'type-logo') : '<img src="/assets/icon/'+item.name+'.ico" width="18px">')+'&nbsp;'+item.showname+'</th>');
 			});
 			$.each(data.channels, function (i, item) {
 				$('#order_today').append('<td>今日：'+item.order_today+' 元</td>');

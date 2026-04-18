@@ -31,6 +31,7 @@ if(strpos($_SERVER['HTTP_USER_AGENT'], 'MicroMessenger')!==false){
 <title>收银台 | <?php echo $sitename?$sitename:$conf['sitename']?> </title>
 <link href="/assets/css/reset.css" rel="stylesheet" type="text/css">
 <link href="/assets/css/main12.css?v=2" rel="stylesheet" type="text/css">
+<link href="/assets/css/pay-type-icon.css" rel="stylesheet" type="text/css">
 </head>
 <body style="background-color:#f9f9f9">
 <!--导航-->
@@ -86,7 +87,7 @@ if(strpos($_SERVER['HTTP_USER_AGENT'], 'MicroMessenger')!==false){
         <ul class="types">
 		<?php foreach($paytype as $rows){?>
           <li class="pay_li" value="<?php echo $rows['id']?>">
-             <img src="/assets/icon/<?php echo $rows['name']?>.ico">
+             <?php echo pay_type_icon_html($rows['name'], 'type-logo'); ?>
                     <span><?php echo $rows['showname']?></span>
           </li>
 		<?php }?>

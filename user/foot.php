@@ -12,6 +12,7 @@
 </div>
 
 <script src="<?php echo $cdnpublic?>jquery/3.4.1/jquery.min.js"></script>
+<script src="../assets/js/pay-type-icon.js"></script>
 <script src="<?php echo $cdnpublic?>twitter-bootstrap/3.4.1/js/bootstrap.min.js"></script>
 <script src="./assets/js/ui-load.js"></script>
 <script src="./assets/js/ui-jp.config.js"></script>

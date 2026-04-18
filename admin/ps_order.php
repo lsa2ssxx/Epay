@@ -137,7 +137,7 @@ $(document).ready(function(){
 				field: 'channelid',
 				title: '支付方式(通道ID)',
 				formatter: function(value, row, index) {
-					return row.channelname?'<img src="/assets/icon/'+row.typename+'.ico" class="type-logo" onerror="this.style.display=\'none\'">'+row.typeshowname+'(<a href="./pay_channel.php?kw='+row.channelid+'" target="_blank" title='+row.channelname+'>'+row.channelid+'</a>)':null;
+					return row.channelname?(typeof payTypeIconHtml === 'function' ? payTypeIconHtml(row.typename, 'type-logo') : '<img src="/assets/icon/'+row.typename+'.ico" class="type-logo" onerror="this.style.display=\'none\'">')+row.typeshowname+'(<a href="./pay_channel.php?kw='+row.channelid+'" target="_blank" title='+row.channelname+'>'+row.channelid+'</a>)':null;
 				}
 			},
 			{

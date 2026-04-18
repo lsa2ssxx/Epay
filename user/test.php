@@ -26,6 +26,7 @@ if(isset($_GET['ok']) && isset($_GET['trade_no'])){
 	<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
 	<title><?php echo $conf['sitename']?> - 测试支付</title>
     <link href="<?php echo $cdnpublic?>twitter-bootstrap/3.4.1/css/bootstrap.min.css" rel="stylesheet"/>
+	<link rel="stylesheet" href="../assets/css/pay-type-icon.css" type="text/css" />
 	<link rel="stylesheet" href="./assets/css/captcha.css" type="text/css" />
 	<style>.form-group{margin-bottom:18px} #captcha{margin: auto;margin-bottom:16px}</style>
 </head>
@@ -72,7 +73,7 @@ if(isset($_GET['ok']) && isset($_GET['trade_no'])){
 <div class="btn-group btn-group-justified" role="group" aria-label="...">
 <?php foreach($paytype as $rows){?>
 <div class="btn-group" role="group">
-  <button type="button" name="type" value="<?php echo $rows['id']?>" class="btn btn-default" onclick="submitPay(this)"><img src="/assets/icon/<?php echo $rows['name']?>.ico" height="18">&nbsp;<?php echo $rows['showname']?></button>
+  <button type="button" name="type" value="<?php echo $rows['id']?>" class="btn btn-default" onclick="submitPay(this)"><?php echo pay_type_icon_html($rows['name'], 'type-logo', ' height="18" width="18"'); ?>&nbsp;<?php echo $rows['showname']?></button>
 </div>
 <?php }?>
 </div>

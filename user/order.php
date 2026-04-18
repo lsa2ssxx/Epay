@@ -169,7 +169,7 @@ $(document).ready(function(){
 				field: 'typename',
 				title: '支付方式',
 				formatter: function(value, row, index) {
-					var html = value ? '<b><img src="/assets/icon/'+value+'.ico" width="16" onerror="this.style.display=\'none\'">'+row.typeshowname+'</b>' : '';
+					var html = value ? '<b>'+(typeof payTypeIconHtml === 'function' ? payTypeIconHtml(value, 'type-logo', ' width="16" height="16"') : '<img src="/assets/icon/'+value+'.ico" width="16" onerror="this.style.display=\'none\'">')+row.typeshowname+'</b>' : '';
 					if(row.subchannel > 0 && row.submchid > 0){
 						html += '('+row.submchid+')';
 					}

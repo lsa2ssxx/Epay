@@ -167,7 +167,7 @@ $(document).ready(function(){
 				field: 'type',
 				title: '支付方式(通道ID)<br/>支付插件',
 				formatter: function(value, row, index) {
-					return row.typename ? '<img src="/assets/icon/'+row.typename+'.ico" class="type-logo" onerror="this.style.display=\'none\'">'+row.typeshowname+'(<a href="./pay_channel.php?kw='+row.channel+'" target="_blank" title="'+row.channelname+'">'+row.channel+'</a>)<br/>'+row.plugin : '';
+					return row.typename ? (typeof payTypeIconHtml === 'function' ? payTypeIconHtml(row.typename, 'type-logo') : '<img src="/assets/icon/'+row.typename+'.ico" class="type-logo" onerror="this.style.display=\'none\'">')+row.typeshowname+'(<a href="./pay_channel.php?kw='+row.channel+'" target="_blank" title="'+row.channelname+'">'+row.channel+'</a>)<br/>'+row.plugin : '';
 				}
 			},
 			{

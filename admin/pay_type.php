@@ -58,8 +58,7 @@ function pay_type_render_rows($rows){
 		}
 		$nameDisp = htmlspecialchars($res['name'], ENT_QUOTES, 'UTF-8');
 		$shownameDisp = htmlspecialchars($res['showname'], ENT_QUOTES, 'UTF-8');
-		$iconName = $res['name'];
-		echo '<tr><td><b>'.$nameDisp.'</b></td><td><img src="/assets/icon/'.$iconName.'.ico" class="type-logo" onerror="this.style.display=\'none\'">'.$shownameDisp.$pluginNote.'</td><td>'.display_device($res['device']).'</td><td><a onclick="getAll(0,'.$res['id'].',this)" title="点此获取最新数据">[刷新]</a></td><td>'.($res['status']==1?'<a class="btn btn-xs btn-success" onclick="setStatus('.$res['id'].',0)">已开启</a>':'<a class="btn btn-xs btn-warning" onclick="setStatus('.$res['id'].',1)">已关闭</a>').'</td><td><a class="btn btn-xs btn-info" onclick="editframe('.$res['id'].')">编辑</a>&nbsp;<a class="btn btn-xs btn-danger" onclick="delItem('.$res['id'].')">删除</a>&nbsp;<a href="./order.php?type='.$res['id'].'" target="_blank" class="btn btn-xs btn-default">订单</a></td></tr>';
+		echo '<tr><td><b>'.$nameDisp.'</b></td><td>'.pay_type_icon_html($res['name'], 'type-logo').$shownameDisp.$pluginNote.'</td><td>'.display_device($res['device']).'</td><td><a onclick="getAll(0,'.$res['id'].',this)" title="点此获取最新数据">[刷新]</a></td><td>'.($res['status']==1?'<a class="btn btn-xs btn-success" onclick="setStatus('.$res['id'].',0)">已开启</a>':'<a class="btn btn-xs btn-warning" onclick="setStatus('.$res['id'].',1)">已关闭</a>').'</td><td><a class="btn btn-xs btn-info" onclick="editframe('.$res['id'].')">编辑</a>&nbsp;<a class="btn btn-xs btn-danger" onclick="delItem('.$res['id'].')">删除</a>&nbsp;<a href="./order.php?type='.$res['id'].'" target="_blank" class="btn btn-xs btn-default">订单</a></td></tr>';
 	}
 }
 

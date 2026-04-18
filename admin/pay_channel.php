@@ -210,7 +210,7 @@ function getChannelTableColumns() {
 			field: 'type',
 			title: '支付方式',
 			formatter: function(value, row, index) {
-				return '<img src="/assets/icon/'+row.typename+'.ico" class="type-logo" onerror="this.style.display=\'none\'">'+row.typeshowname;
+				return (typeof payTypeIconHtml === 'function' ? payTypeIconHtml(row.typename, 'type-logo') : '<img src="/assets/icon/'+row.typename+'.ico" class="type-logo" onerror="this.style.display=\'none\'">')+row.typeshowname;
 			}
 		},
 		{

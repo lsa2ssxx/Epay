@@ -32,7 +32,8 @@ $_SESSION['csrf_token'] = $csrf_token;
 <link rel="stylesheet" href="<?php echo $cdnpublic?>font-awesome/4.7.0/css/font-awesome.min.css" type="text/css" />
 <link rel="stylesheet" href="./assets/css/font.css" type="text/css" />
 <link rel="stylesheet" href="./assets/css/app.css" type="text/css" />
-<style>input:-webkit-autofill{-webkit-box-shadow:0 0 0px 1000px white inset;-webkit-text-fill-color:#333;}img.logo{width:14px;height:14px;margin:0 5px 0 3px;}</style>
+<link rel="stylesheet" href="../assets/css/pay-type-icon.css" type="text/css" />
+<style>input:-webkit-autofill{-webkit-box-shadow:0 0 0px 1000px white inset;-webkit-text-fill-color:#333;}img.logo{width:14px;height:14px;margin:0 5px 0 3px;}.pay-type-icon-stack img.logo{width:20px;height:20px;}</style>
 </head>
 <body>
 
@@ -112,6 +113,7 @@ $_SESSION['csrf_token'] = $csrf_token;
 </div>
 </div>
 <script src="<?php echo $cdnpublic?>jquery/3.4.1/jquery.min.js"></script>
+<script src="../assets/js/pay-type-icon.js"></script>
 <script src="<?php echo $cdnpublic?>twitter-bootstrap/3.4.1/js/bootstrap.min.js"></script>
 <script src="<?php echo $cdnpublic?>jquery-cookie/1.4.1/jquery.cookie.min.js"></script>
 <script src="<?php echo $cdnpublic?>layer/3.1.1/layer.js"></script>
@@ -241,7 +243,7 @@ $(document).ready(function(){
 				}else if(data.code == 2){
 					var paymsg = '';
 					$.each(data.paytype, function(key, value) {
-						paymsg+='<button class="btn btn-default btn-block" onclick="window.location.href=\'../submit2.php?typeid='+key+'&trade_no='+data.trade_no+'\'" style="margin-top:10px;"><img width="20" src="../assets/icon/'+value.name+'.ico" class="logo">'+value.showname+'</button>';
+						paymsg+='<button class="btn btn-default btn-block" onclick="window.location.href=\'../submit2.php?typeid='+key+'&trade_no='+data.trade_no+'\'" style="margin-top:10px;">'+(typeof payTypeIconHtml === 'function' ? payTypeIconHtml(value.name, 'logo', ' width="20" height="20"') : '<img width="20" src="../assets/icon/'+value.name+'.ico" class="logo">')+value.showname+'</button>';
 					});
 					layer.alert('<center><h2>¥ '+data.need+'</h2><hr>'+paymsg+'<hr>提示：支付完成后即可直接登录</center>',{
 						btn:[],

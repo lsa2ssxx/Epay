@@ -78,6 +78,7 @@ if ($conf['version'] < DB_VERSION) {
 }
 
 include_once(SYSTEM_ROOT."functions.php");
+include_once(SYSTEM_ROOT."pay_type_icon.php");
 include_once(SYSTEM_ROOT."member.php");
 
 require_once SYSTEM_ROOT."vendor/autoload.php";

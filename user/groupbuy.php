@@ -32,7 +32,7 @@ function display_info($info){
 				$v['rate'] = $DB->getColumn("SELECT rate FROM pre_channel WHERE id=:id", [':id'=>$v['channel']]);
 			}
 		}
-		$result .= '<label><img src="/assets/icon/'.$paytypes[$k].'.ico" width="18px" title="'.$v['channel'].'">&nbsp;'.$paytype[$k].'('.round(100-$v['rate'],2).'%)</label>&nbsp;&nbsp;';
+		$result .= '<label>'.pay_type_icon_html($paytypes[$k], 'type-logo', ' width="18" height="18"').'&nbsp;'.$paytype[$k].'('.round(100-$v['rate'],2).'%)</label>&nbsp;&nbsp;';
 	}
 	return substr($result,0,-1);
 }
