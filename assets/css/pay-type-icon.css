@@ -1,4 +1,4 @@
-/* USDT/USDC：主图标 + 链角标 */
+/* USDT/USDC：主图标 + 链 Logo（或回退文字角标） */
 .pay-type-icon-stack {
 	position: relative;
 	display: inline-block;
@@ -7,11 +7,25 @@
 	margin-right: 2px;
 }
 .pay-type-icon-stack .pay-type-icon-token,
-.pay-type-icon-stack img {
+.pay-type-icon-stack > img.pay-type-icon-token {
 	width: 18px;
 	height: 18px;
 	object-fit: contain;
 }
+/* 链品牌小圆标（独立 logo） */
+.pay-type-chain-logo {
+	position: absolute;
+	right: -4px;
+	bottom: -3px;
+	width: 14px;
+	height: 14px;
+	border-radius: 50%;
+	object-fit: cover;
+	box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.95);
+	background: #fff;
+	pointer-events: none;
+}
+/* 无独立素材时的文字回退 */
 .pay-type-chain-badge {
 	position: absolute;
 	right: -3px;

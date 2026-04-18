@@ -1,6 +1,6 @@
 <?php
 /**
- * 支付方式图标：稳定币主图 + 链角标（usdt.* / usdc.* 细化网络）
+ * 支付方式图标：稳定币主图 + 链 Logo 角标（usdt.* / usdc.*）
  */
 if (!function_exists('pay_type_icon_src')) {
 	function pay_type_icon_src($typename)
@@ -11,9 +11,30 @@ if (!function_exists('pay_type_icon_src')) {
 	}
 
 	/**
+	 * 已知链独立品牌 Logo（相对网站根路径）；无映射时在 pay_type_chain_overlay_for 中回退为文字角标。
+	 *
+	 * @return array<string,string>
+	 */
+	function pay_type_chain_logo_map()
+	{
+		return [
+			'trc20' => '/assets/icon/chain/tron.svg',
+			'erc20' => '/assets/icon/chain/erc20.svg',
+			'bep20' => '/assets/icon/chain/bsc.svg',
+			'polygon' => '/assets/icon/chain/polygon.svg',
+			'arbitrum' => '/assets/icon/chain/arbitrum.png',
+			'solana' => '/assets/icon/chain/solana.svg',
+			'aptos' => '/assets/icon/chain/aptos.png',
+			'xlayer' => '/assets/icon/chain/xlayer.png',
+			'base' => '/assets/icon/chain/base.png',
+			'plasma' => '/assets/icon/chain/plasma.png',
+		];
+	}
+
+	/**
 	 * @return array{label:string,bg:string,title:string}|null
 	 */
-	function pay_type_chain_badge_for($typename)
+	function pay_type_chain_text_fallback($typename)
 	{
 		if (!preg_match('/^(usdt|usdc)\.([a-z0-9]+)$/', (string) $typename, $m)) {
 			return null;
@@ -49,20 +70,58 @@ if (!function_exists('pay_type_icon_src')) {
 		];
 	}
 
+	/**
+	 * @return array{type:'logo',src:string,title:string}|array{type:'text',badge:array{label:string,bg:string,title:string},title:string}|null
+	 */
+	function pay_type_chain_overlay_for($typename)
+	{
+		if (!preg_match('/^(usdt|usdc)\.([a-z0-9]+)$/', (string) $typename, $m)) {
+			return null;
+		}
+		$token = strtoupper($m[1]);
+		$chain = $m[2];
+		$title = $token . ' · ' . $chain;
+		$logos = pay_type_chain_logo_map();
+		if (isset($logos[$chain])) {
+			return ['type' => 'logo', 'src' => $logos[$chain], 'title' => $title];
+		}
+		$badge = pay_type_chain_text_fallback($typename);
+		if (!$badge) {
+			return null;
+		}
+
+		return ['type' => 'text', 'badge' => $badge, 'title' => $title];
+	}
+
+	/** @deprecated 使用 pay_type_chain_overlay_for */
+	function pay_type_chain_badge_for($typename)
+	{
+		return pay_type_chain_text_fallback($typename);
+	}
+
 	function pay_type_icon_html($typename, $imgClass = 'type-logo', $extraAttrs = '')
 	{
 		$tn = (string) $typename;
 		$src = htmlspecialchars(pay_type_icon_src($tn), ENT_QUOTES, 'UTF-8');
-		$badge = pay_type_chain_badge_for($tn);
+		$overlay = pay_type_chain_overlay_for($tn);
 		$cls = htmlspecialchars($imgClass, ENT_QUOTES, 'UTF-8');
-		$img = '<img src="' . $src . '" class="' . $cls . ($badge ? ' pay-type-icon-token' : '') . '" alt="" onerror="this.style.display=\'none\'"' . $extraAttrs . '>';
-		if (!$badge) {
+		$img = '<img src="' . $src . '" class="' . $cls . ($overlay ? ' pay-type-icon-token' : '') . '" alt="" onerror="this.style.display=\'none\'"' . $extraAttrs . '>';
+		if (!$overlay) {
 			return $img;
 		}
-		$title = htmlspecialchars($badge['title'], ENT_QUOTES, 'UTF-8');
-		$label = htmlspecialchars($badge['label'], ENT_QUOTES, 'UTF-8');
-		$bg = htmlspecialchars($badge['bg'], ENT_QUOTES, 'UTF-8');
+		$title = htmlspecialchars($overlay['title'], ENT_QUOTES, 'UTF-8');
+		$html = '<span class="pay-type-icon-stack" title="' . $title . '">' . $img;
+		if ($overlay['type'] === 'logo') {
+			$lsrc = htmlspecialchars($overlay['src'], ENT_QUOTES, 'UTF-8');
+			$html .= '<img src="' . $lsrc . '" class="pay-type-chain-logo" alt="" loading="lazy" decoding="async" onerror="this.style.visibility=\'hidden\'">';
+		} else {
+			$b = $overlay['badge'];
+			$label = htmlspecialchars($b['label'], ENT_QUOTES, 'UTF-8');
+			$bg = htmlspecialchars($b['bg'], ENT_QUOTES, 'UTF-8');
+			$html .= '<span class="pay-type-chain-badge" style="background:' . $bg . '">' . $label . '</span>';
+		}
+		$html .= '</span>';
 
-		return '<span class="pay-type-icon-stack" title="' . $title . '">' . $img . '<span class="pay-type-chain-badge" style="background:' . $bg . '">' . $label . '</span></span>';
+		return $html;
 	}
 }
