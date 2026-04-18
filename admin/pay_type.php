@@ -3,6 +3,7 @@
  * 支付方式
 **/
 include("../includes/common.php");
+include_once SYSTEM_ROOT.'pay_type_crypto_sort.php';
 $title='支付方式';
 include './head.php';
 if($islogin==1){}else exit("<script language='javascript'>window.location.href='./login.php';</script>");
@@ -63,52 +64,15 @@ function pay_type_render_rows($rows){
 }
 
 /**
- * 单插件面板内行顺序：与插件声明/文档一致；未知调用值排在后并按名字排序。
+ * 单插件面板内行顺序：BEpusdt/TokenPay 按链生态与资产类型深度排序（见 pay_type_crypto_sort.php）；其余按调用值自然序。
  */
 function pay_type_sort_rows_for_plugin(array $rows, $pluginName)
 {
 	if ($pluginName === 'bepusdt') {
-		$fp = PLUGIN_ROOT.'bepusdt/bepusdt_plugin.php';
-		if (is_file($fp)) {
-			include_once $fp;
-		}
-		if (class_exists('bepusdt_plugin', false)) {
-			$order = [];
-			foreach (bepusdt_plugin::tradeTypeCatalog() as $i => $row) {
-				$order[$row['name']] = $i;
-			}
-			usort($rows, function ($a, $b) use ($order) {
-				$ia = $order[$a['name']] ?? 10000;
-				$ib = $order[$b['name']] ?? 10000;
-				if ($ia !== $ib) {
-					return $ia <=> $ib;
-				}
-
-				return strcmp($a['name'], $b['name']);
-			});
-
-			return $rows;
-		}
+		return pay_type_sort_rows_bepusdt_deep($rows);
 	}
 	if ($pluginName === 'TokenPay') {
-		$fp = PLUGIN_ROOT.'TokenPay/TokenPay_plugin.php';
-		if (is_file($fp)) {
-			include_once $fp;
-		}
-		if (class_exists('TokenPay_plugin', false)) {
-			$order = array_flip(TokenPay_plugin::$info['types']);
-			usort($rows, function ($a, $b) use ($order) {
-				$ia = $order[$a['name']] ?? 10000;
-				$ib = $order[$b['name']] ?? 10000;
-				if ($ia !== $ib) {
-					return $ia <=> $ib;
-				}
-
-				return strcmp($a['name'], $b['name']);
-			});
-
-			return $rows;
-		}
+		return pay_type_sort_rows_tokenpay_deep($rows);
 	}
 	usort($rows, function ($a, $b) {
 		return strnatcasecmp($a['name'] ?? '', $b['name'] ?? '');
