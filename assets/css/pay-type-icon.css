@@ -1,46 +1,35 @@
-/* USDT/USDC：主图标 + 链 Logo（或回退文字角标） */
+/* usdt.* / usdc.*：仅链 Logo 或文字回退；其它支付方式为单张 .ico */
 .pay-type-icon-stack {
-	position: relative;
 	display: inline-block;
 	vertical-align: middle;
 	line-height: 0;
 	margin-right: 2px;
 }
-.pay-type-icon-stack .pay-type-icon-token,
-.pay-type-icon-stack > img.pay-type-icon-token {
+/* 仅链图标模式（无主图标） */
+.pay-type-icon-chain-only.pay-type-icon-stack {
+	position: static;
+}
+.pay-type-icon-chain-only .pay-type-chain-logo--solo {
+	display: inline-block;
+	vertical-align: middle;
 	width: 18px;
 	height: 18px;
-	object-fit: contain;
-}
-/* 链品牌小圆标（独立 logo） */
-.pay-type-chain-logo {
-	position: absolute;
-	right: -4px;
-	bottom: -3px;
-	width: 14px;
-	height: 14px;
 	border-radius: 50%;
 	object-fit: cover;
 	box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.95);
 	background: #fff;
-	pointer-events: none;
 }
-/* 无独立素材时的文字回退 */
-.pay-type-chain-badge {
-	position: absolute;
-	right: -3px;
-	bottom: -2px;
-	font-size: 8px;
-	line-height: 1.1;
-	padding: 1px 2px 0;
-	border-radius: 2px;
+.pay-type-icon-chain-only .pay-type-chain-badge--solo {
+	position: static;
+	display: inline-block;
+	vertical-align: middle;
+	font-size: 9px;
+	line-height: 1.2;
+	padding: 2px 5px;
+	border-radius: 3px;
 	color: #fff;
 	font-weight: bold;
-	letter-spacing: -0.02em;
 	box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.85);
-	pointer-events: none;
-	max-width: 26px;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
+	min-width: 22px;
+	text-align: center;
 }

@@ -80,25 +80,37 @@
 	 */
 	function payTypeIconHtml(typename, imgClass, extraAttrs) {
 		var cls = imgClass || 'type-logo';
-		var src = escAttr(payTypeIconSrc(typename));
 		var overlay = chainOverlayFor(typename);
 		var extra = extraAttrs || '';
-		var imgCls = cls + (overlay ? ' pay-type-icon-token' : '');
-		var img = '<img src="' + src + '" class="' + escAttr(imgCls) + '" alt="" onerror="this.style.display=\'none\'"' + extra + '>';
 		if (!overlay) {
-			return img;
+			var src = escAttr(payTypeIconSrc(typename));
+			return (
+				'<img src="' +
+				src +
+				'" class="' +
+				escAttr(cls) +
+				'" alt="" onerror="this.style.display=\'none\'"' +
+				extra +
+				'>'
+			);
 		}
 		var html =
-			'<span class="pay-type-icon-stack" title="' + escAttr(overlay.title) + '">' + img;
+			'<span class="pay-type-icon-stack pay-type-icon-chain-only" title="' +
+			escAttr(overlay.title) +
+			'">';
 		if (overlay.type === 'logo') {
 			html +=
 				'<img src="' +
 				escAttr(overlay.src) +
-				'" class="pay-type-chain-logo" alt="" loading="lazy" decoding="async" onerror="this.style.visibility=\'hidden\'">';
+				'" class="' +
+				escAttr(cls) +
+				' pay-type-chain-logo pay-type-chain-logo--solo" alt="" loading="lazy" decoding="async"' +
+				extra +
+				' onerror="this.style.visibility=\'hidden\'">';
 		} else {
 			var b = overlay.badge;
 			html +=
-				'<span class="pay-type-chain-badge" style="background:' +
+				'<span class="pay-type-chain-badge pay-type-chain-badge--solo" style="background:' +
 				escAttr(b.bg) +
 				'">' +
 				escAttr(b.label) +

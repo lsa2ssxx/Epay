@@ -1,6 +1,6 @@
 <?php
 /**
- * 支付方式图标：稳定币主图 + 链 Logo 角标（usdt.* / usdc.*）
+ * 支付方式图标：usdt.* / usdc.* 仅显示链 Logo（或文字回退）；其它类型显示对应 .ico
  */
 if (!function_exists('pay_type_icon_src')) {
 	function pay_type_icon_src($typename)
@@ -11,8 +11,6 @@ if (!function_exists('pay_type_icon_src')) {
 	}
 
 	/**
-	 * 已知链独立品牌 Logo（相对网站根路径）；无映射时在 pay_type_chain_overlay_for 中回退为文字角标。
-	 *
 	 * @return array<string,string>
 	 */
 	function pay_type_chain_logo_map()
@@ -102,23 +100,25 @@ if (!function_exists('pay_type_icon_src')) {
 	function pay_type_icon_html($typename, $imgClass = 'type-logo', $extraAttrs = '')
 	{
 		$tn = (string) $typename;
-		$src = htmlspecialchars(pay_type_icon_src($tn), ENT_QUOTES, 'UTF-8');
 		$overlay = pay_type_chain_overlay_for($tn);
 		$cls = htmlspecialchars($imgClass, ENT_QUOTES, 'UTF-8');
-		$img = '<img src="' . $src . '" class="' . $cls . ($overlay ? ' pay-type-icon-token' : '') . '" alt="" onerror="this.style.display=\'none\'"' . $extraAttrs . '>';
+
 		if (!$overlay) {
-			return $img;
+			$src = htmlspecialchars(pay_type_icon_src($tn), ENT_QUOTES, 'UTF-8');
+
+			return '<img src="' . $src . '" class="' . $cls . '" alt="" onerror="this.style.display=\'none\'"' . $extraAttrs . '>';
 		}
+
 		$title = htmlspecialchars($overlay['title'], ENT_QUOTES, 'UTF-8');
-		$html = '<span class="pay-type-icon-stack" title="' . $title . '">' . $img;
+		$html = '<span class="pay-type-icon-stack pay-type-icon-chain-only" title="' . $title . '">';
 		if ($overlay['type'] === 'logo') {
 			$lsrc = htmlspecialchars($overlay['src'], ENT_QUOTES, 'UTF-8');
-			$html .= '<img src="' . $lsrc . '" class="pay-type-chain-logo" alt="" loading="lazy" decoding="async" onerror="this.style.visibility=\'hidden\'">';
+			$html .= '<img src="' . $lsrc . '" class="' . $cls . ' pay-type-chain-logo pay-type-chain-logo--solo" alt="" loading="lazy" decoding="async" onerror="this.style.visibility=\'hidden\'"' . $extraAttrs . '>';
 		} else {
 			$b = $overlay['badge'];
 			$label = htmlspecialchars($b['label'], ENT_QUOTES, 'UTF-8');
 			$bg = htmlspecialchars($b['bg'], ENT_QUOTES, 'UTF-8');
-			$html .= '<span class="pay-type-chain-badge" style="background:' . $bg . '">' . $label . '</span>';
+			$html .= '<span class="pay-type-chain-badge pay-type-chain-badge--solo" style="background:' . $bg . '">' . $label . '</span>';
 		}
 		$html .= '</span>';
 
