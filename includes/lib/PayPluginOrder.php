@@ -9,8 +9,8 @@ class PayPluginOrder {
 	/**
 	 * 同一插件内：优先 USDT 系（调用值 usdt / usdt.*），其次 USDC 系，其余按插件 types 原有顺序。
 	 */
-	public static function stableAssetGroup(string $typename): int {
-		$t = strtolower(trim($typename));
+	public static function stableAssetGroup($typename): int {
+		$t = strtolower(trim((string)$typename));
 		if($t === 'usdt' || strpos($t, 'usdt.') === 0){
 			return 0;
 		}

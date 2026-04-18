@@ -31,49 +31,85 @@ case 'getcount':
 	}
 
 	$typeRows = $DB->getAll("SELECT id,name,showname FROM pre_type WHERE status=1 ORDER BY id ASC");
-	$typeRows = \lib\PayPluginOrder::sortEnabledPayTypeRows($typeRows);
+	if(!is_array($typeRows)){
+		$typeRows = [];
+	}
+	try{
+		$typeRows = \lib\PayPluginOrder::sortEnabledPayTypeRows($typeRows);
+	}catch(\Throwable $e){
+		// 排序异常时保持数据库顺序，避免首页统计 500
+	}
 	$paytype = [];
 	$paytype_typename = [];
 	foreach($typeRows as $row){
+		if(!isset($row['id'], $row['name'], $row['showname'])){
+			continue;
+		}
 		$paytype[$row['id']] = $row['showname'];
 		$paytype_typename[$row['id']] = $row['name'];
 	}
 	unset($typeRows);
 
 	$chRows = $DB->getAll("SELECT A.id,A.name,A.plugin,B.name typename FROM pre_channel A LEFT JOIN pre_type B ON A.type=B.id WHERE A.status=1");
-	$chRows = \lib\PayPluginOrder::sortChannelRows($chRows);
+	if(!is_array($chRows)){
+		$chRows = [];
+	}
+	try{
+		$chRows = \lib\PayPluginOrder::sortChannelRows($chRows);
+	}catch(\Throwable $e){
+	}
 	$channel = [];
 	$channel_typename = [];
 	foreach($chRows as $row){
+		if(!isset($row['id'], $row['name'])){
+			continue;
+		}
 		$channel[$row['id']] = $row['name'];
-		$channel_typename[$row['id']] = $row['typename'] !== null ? $row['typename'] : '';
+		$channel_typename[$row['id']] = isset($row['typename']) && $row['typename'] !== null ? $row['typename'] : '';
 	}
 	unset($chRows);
 
 	$tongji_cachetime=getSetting('tongji_cachetime', true);
 	$tongji_cache = $CACHE->read('tongji');
 	if($tongji_cachetime+3600>=time() && $tongji_cache && !isset($_GET['getnew'])){
-		$array = unserialize($tongji_cache);
-		$result=["code"=>0,"type"=>"cache","paytype"=>$paytype,"paytype_typename"=>$paytype_typename,"channel"=>$channel,"channel_typename"=>$channel_typename,"count1"=>$count1,"count2"=>$count2,"usermoney"=>round($array['usermoney'],2),"settlemoney"=>round($array['settlemoney'],2),"success_rate"=>$success_rate,"order_today"=>$array['order_today'],"order"=>[]];
+		$array = @unserialize($tongji_cache);
+		if(!is_array($array)){
+			$array = ['usermoney'=>0,'settlemoney'=>0,'order_today'=>['all'=>0,'profit_all'=>0,'paytype'=>[],'channel'=>[],'profit_paytype'=>[]]];
+		}
+		$result=["code"=>0,"type"=>"cache","paytype"=>$paytype,"paytype_typename"=>$paytype_typename,"channel"=>$channel,"channel_typename"=>$channel_typename,"count1"=>$count1,"count2"=>$count2,"usermoney"=>round(floatval($array['usermoney'] ?? 0),2),"settlemoney"=>round(floatval($array['settlemoney'] ?? 0),2),"success_rate"=>$success_rate,"order_today"=>$array['order_today'] ?? ['all'=>0,'profit_all'=>0,'paytype'=>[],'channel'=>[],'profit_paytype'=>[]],"order"=>[]];
 	}else{
 		$usermoney=$DB->getColumn("SELECT SUM(money) FROM pre_user WHERE money!='0.00'");
 		$settlemoney=$DB->getColumn("SELECT SUM(money) FROM pre_settle");
 
 		$today=date("Y-m-d");
 		$rs=$DB->query("SELECT type,channel,realmoney,profitmoney from pre_order where status=1 and date>='$today'");
+		$order_paytype = [];
+		$profit_paytype = [];
+		$order_channel = [];
 		foreach($paytype as $id=>$type){
-			$order_paytype[$id]=0;
-			$profit_paytype[$id]=0;
+			$order_paytype[$id] = 0;
+			$profit_paytype[$id] = 0;
 		}
 		foreach($channel as $id=>$type){
-			$order_channel[$id]=0;
+			$order_channel[$id] = 0;
 		}
 		while($row = $rs->fetch())
 		{
-			$order_paytype[$row['type']]+=$row['realmoney'];
-			$order_channel[$row['channel']]+=$row['realmoney'];
+			$tid = intval($row['type']);
+			$cid = intval($row['channel']);
+			if(!isset($order_paytype[$tid])){
+				$order_paytype[$tid] = 0;
+			}
+			if(!isset($profit_paytype[$tid])){
+				$profit_paytype[$tid] = 0;
+			}
+			if(!isset($order_channel[$cid])){
+				$order_channel[$cid] = 0;
+			}
+			$order_paytype[$tid] += floatval($row['realmoney']);
+			$order_channel[$cid] += floatval($row['realmoney']);
 			if(!empty($row['profitmoney'])){
-				$profit_paytype[$row['type']]+=$row['profitmoney'];
+				$profit_paytype[$tid] += floatval($row['profitmoney']);
 			}
 		}
 		foreach($order_paytype as $k=>$v){
@@ -113,7 +149,11 @@ case 'getcount':
 			break;
 		}
 	}
-	exit(json_encode($result));
+	$jsonFlags = JSON_UNESCAPED_UNICODE;
+	if(defined('JSON_INVALID_UTF8_SUBSTITUTE')){
+		$jsonFlags |= JSON_INVALID_UTF8_SUBSTITUTE;
+	}
+	exit(json_encode($result, $jsonFlags));
 break;
 
 case 'set':

@@ -31,7 +31,13 @@ case 'channelList':
 		$sql.=" AND (A.`id`='{$kw}' OR A.`name` like '%{$kw}%')";
 	}
 	$list = $DB->getAll("SELECT A.*,B.name typename,B.showname typeshowname FROM pre_channel A LEFT JOIN pre_type B ON A.type=B.id WHERE{$sql} ORDER BY id DESC");
-	$list = \lib\PayPluginOrder::sortChannelRows($list);
+	if(!is_array($list)){
+		$list = [];
+	}
+	try{
+		$list = \lib\PayPluginOrder::sortChannelRows($list);
+	}catch(\Throwable $e){
+	}
 	exit(json_encode($list));
 break;
 
