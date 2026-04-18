@@ -2,24 +2,17 @@
 /**
  * 支付方式「加密货币语义」排序（后台列表展示用）
  *
- * BEpusdt：按链生态聚类 — 同链先 USDT、再 USDC、再该链原生币；链顺序大致为
- * TRON → Ethereum → Polygon → BSC → Arbitrum → Base → Solana → Aptos → X Layer → Plasma。
- * TokenPay：同类聚类（TRON / ETH / BSC / Polygon），同生态内先原生或按 USDT→USDC。
+ * BEpusdt：先整块 USDT（各链按 TRC→ETH→Polygon→BSC→Arb→Sol→Aptos→XL→Plasma），
+ * 再整块 USDC（同上链序，另含 Base），最后原生币 TRX / ETH / BNB。
+ * TokenPay：先全部 USDT 类型，再全部 USDC，再各链原生（TRX、ETH、BNB、POL）。
  */
 if (!function_exists('pay_type_bepusdt_deep_order')) {
 	function pay_type_bepusdt_deep_order(): array
 	{
 		return [
-			'usdt.trc20', 'usdc.trc20', 'tron.trx',
-			'usdt.erc20', 'usdc.erc20', 'ethereum.eth',
-			'usdt.polygon', 'usdc.polygon',
-			'usdt.bep20', 'usdc.bep20', 'bsc.bnb',
-			'usdt.arbitrum', 'usdc.arbitrum',
-			'usdc.base',
-			'usdt.solana', 'usdc.solana',
-			'usdt.aptos', 'usdc.aptos',
-			'usdt.xlayer', 'usdc.xlayer',
-			'usdt.plasma',
+			'usdt.trc20', 'usdt.erc20', 'usdt.polygon', 'usdt.bep20', 'usdt.arbitrum', 'usdt.solana', 'usdt.aptos', 'usdt.xlayer', 'usdt.plasma',
+			'usdc.trc20', 'usdc.erc20', 'usdc.polygon', 'usdc.bep20', 'usdc.arbitrum', 'usdc.base', 'usdc.solana', 'usdc.aptos', 'usdc.xlayer',
+			'tron.trx', 'ethereum.eth', 'bsc.bnb',
 		];
 	}
 
@@ -59,10 +52,9 @@ if (!function_exists('pay_type_bepusdt_deep_order')) {
 	function pay_type_tokenpay_deep_order(): array
 	{
 		return [
-			'USDT_TRC20', 'TRX',
-			'EVM_ETH_ETH', 'EVM_ETH_USDT_ERC20', 'EVM_ETH_USDC_ERC20',
-			'EVM_BSC_BNB', 'EVM_BSC_USDT_BEP20', 'EVM_BSC_USDC_BEP20',
-			'EVM_Polygon_POL', 'EVM_Polygon_USDT_ERC20', 'EVM_Polygon_USDC_ERC20',
+			'USDT_TRC20', 'EVM_ETH_USDT_ERC20', 'EVM_BSC_USDT_BEP20', 'EVM_Polygon_USDT_ERC20',
+			'EVM_ETH_USDC_ERC20', 'EVM_BSC_USDC_BEP20', 'EVM_Polygon_USDC_ERC20',
+			'TRX', 'EVM_ETH_ETH', 'EVM_BSC_BNB', 'EVM_Polygon_POL',
 		];
 	}
 

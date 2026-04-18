@@ -64,7 +64,7 @@ function pay_type_render_rows($rows){
 }
 
 /**
- * 单插件面板内行顺序：BEpusdt/TokenPay 按链生态与资产类型深度排序（见 pay_type_crypto_sort.php）；其余按调用值自然序。
+ * 单插件面板内行顺序：BEpusdt/TokenPay 按资产类型深度排序（USDT 整块→USDC 整块→原生币，见 pay_type_crypto_sort.php）；其余按调用值自然序。
  */
 function pay_type_sort_rows_for_plugin(array $rows, $pluginName)
 {
