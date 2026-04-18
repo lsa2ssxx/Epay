@@ -6,6 +6,37 @@ namespace lib;
  */
 class PayPluginOrder {
 
+	/**
+	 * 同一插件内：优先 USDT 系（调用值 usdt / usdt.*），其次 USDC 系，其余按插件 types 原有顺序。
+	 */
+	public static function stableAssetGroup(string $typename): int {
+		$t = strtolower(trim($typename));
+		if($t === 'usdt' || strpos($t, 'usdt.') === 0){
+			return 0;
+		}
+		if($t === 'usdc' || strpos($t, 'usdc.') === 0){
+			return 1;
+		}
+		return 2;
+	}
+
+	/**
+	 * 将插件 types 列表重排为：先全部 usdt.*（保持原相对顺序），再 usdc.*，再其它。
+	 *
+	 * @param string[] $tokens
+	 * @return string[]
+	 */
+	public static function reorderTokensStableFirst(array $tokens): array {
+		$b = [[], [], []];
+		foreach($tokens as $t){
+			if($t === ''){
+				continue;
+			}
+			$b[self::stableAssetGroup($t)][] = $t;
+		}
+		return array_merge($b[0], $b[1], $b[2]);
+	}
+
 	/** @return array<string, array<string,bool>> typename => [ pluginDir => true ] */
 	public static function typeNameToPluginsMap(): array {
 		$typeToPlugins = [];
@@ -61,7 +92,14 @@ class PayPluginOrder {
 			}
 		}
 		$common = array_unique($common);
-		sort($common, SORT_STRING);
+		usort($common, function($a, $b){
+			$ga = self::stableAssetGroup($a);
+			$gb = self::stableAssetGroup($b);
+			if($ga !== $gb){
+				return $ga <=> $gb;
+			}
+			return strcmp($a, $b);
+		});
 		$ordered = [];
 		foreach($common as $n){
 			if(isset($nameSet[$n])){
@@ -83,6 +121,7 @@ class PayPluginOrder {
 					$types = explode(',', (string)$types);
 				}
 				$tokens = array_unique(array_filter(array_map('trim', $types)));
+				$tokens = self::reorderTokensStableFirst($tokens);
 			}
 			foreach($tokens as $t){
 				if(!empty($exclusive[$pn][$t])){
@@ -92,14 +131,28 @@ class PayPluginOrder {
 			}
 			if(!empty($exclusive[$pn])){
 				$left = array_keys($exclusive[$pn]);
-				sort($left, SORT_STRING);
+				usort($left, function($a, $b){
+					$ga = self::stableAssetGroup($a);
+					$gb = self::stableAssetGroup($b);
+					if($ga !== $gb){
+						return $ga <=> $gb;
+					}
+					return strcmp($a, $b);
+				});
 				foreach($left as $t){
 					$ordered[] = $t;
 				}
 			}
 		}
 
-		sort($none, SORT_STRING);
+		usort($none, function($a, $b){
+			$ga = self::stableAssetGroup($a);
+			$gb = self::stableAssetGroup($b);
+			if($ga !== $gb){
+				return $ga <=> $gb;
+			}
+			return strcmp($a, $b);
+		});
 		foreach($none as $n){
 			$ordered[] = $n;
 		}
@@ -183,8 +236,15 @@ class PayPluginOrder {
 			if($ra !== $rb){
 				return $ra <=> $rb;
 			}
-			$ia = $getIdx($pa, $a['typename'] ?? '');
-			$ib = $getIdx($pb, $b['typename'] ?? '');
+			$ta = (string)($a['typename'] ?? '');
+			$tb = (string)($b['typename'] ?? '');
+			$ga = self::stableAssetGroup($ta);
+			$gb = self::stableAssetGroup($tb);
+			if($ga !== $gb){
+				return $ga <=> $gb;
+			}
+			$ia = $getIdx($pa, $ta);
+			$ib = $getIdx($pb, $tb);
 			if($ia !== $ib){
 				return $ia <=> $ib;
 			}
