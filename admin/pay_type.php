@@ -62,6 +62,71 @@ function pay_type_render_rows($rows){
 	}
 }
 
+/**
+ * 单插件面板内行顺序：与插件声明/文档一致；未知调用值排在后并按名字排序。
+ */
+function pay_type_sort_rows_for_plugin(array $rows, $pluginName)
+{
+	if ($pluginName === 'bepusdt') {
+		$fp = PLUGIN_ROOT.'bepusdt/bepusdt_plugin.php';
+		if (is_file($fp)) {
+			include_once $fp;
+		}
+		if (class_exists('bepusdt_plugin', false)) {
+			$order = [];
+			foreach (bepusdt_plugin::tradeTypeCatalog() as $i => $row) {
+				$order[$row['name']] = $i;
+			}
+			usort($rows, function ($a, $b) use ($order) {
+				$ia = $order[$a['name']] ?? 10000;
+				$ib = $order[$b['name']] ?? 10000;
+				if ($ia !== $ib) {
+					return $ia <=> $ib;
+				}
+
+				return strcmp($a['name'], $b['name']);
+			});
+
+			return $rows;
+		}
+	}
+	if ($pluginName === 'TokenPay') {
+		$fp = PLUGIN_ROOT.'TokenPay/TokenPay_plugin.php';
+		if (is_file($fp)) {
+			include_once $fp;
+		}
+		if (class_exists('TokenPay_plugin', false)) {
+			$order = array_flip(TokenPay_plugin::$info['types']);
+			usort($rows, function ($a, $b) use ($order) {
+				$ia = $order[$a['name']] ?? 10000;
+				$ib = $order[$b['name']] ?? 10000;
+				if ($ia !== $ib) {
+					return $ia <=> $ib;
+				}
+
+				return strcmp($a['name'], $b['name']);
+			});
+
+			return $rows;
+		}
+	}
+	usort($rows, function ($a, $b) {
+		return strnatcasecmp($a['name'] ?? '', $b['name'] ?? '');
+	});
+
+	return $rows;
+}
+
+/** 通用 / 其他分组：按调用值自然序 */
+function pay_type_sort_rows_default(array $rows)
+{
+	usort($rows, function ($a, $b) {
+		return strnatcasecmp($a['name'] ?? '', $b['name'] ?? '');
+	});
+
+	return $rows;
+}
+
 $list = $DB->getAll("SELECT * FROM pre_type ORDER BY id ASC");
 $plugins = [];
 foreach(\lib\Plugin::getList() as $pn){
@@ -117,6 +182,15 @@ foreach($list as $res){
 	}
 }
 ksort($bucket_by_plugin);
+foreach ($bucket_by_plugin as $k => $pack) {
+	$bucket_by_plugin[$k]['rows'] = pay_type_sort_rows_for_plugin($pack['rows'], $pack['meta']['name']);
+}
+if (count($bucket_common) > 0) {
+	$bucket_common = pay_type_sort_rows_default($bucket_common);
+}
+if (count($bucket_other) > 0) {
+	$bucket_other = pay_type_sort_rows_default($bucket_other);
+}
 ?>
 <div class="modal" id="modal-store" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true" data-backdrop="static">
 	<div class="modal-dialog">
