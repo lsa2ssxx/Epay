@@ -30,44 +30,29 @@ case 'getcount':
 		}
 	}
 
-	$typeRows = $DB->getAll("SELECT id,name,showname FROM pre_type WHERE status=1 ORDER BY id ASC");
-	if(!is_array($typeRows)){
-		$typeRows = [];
-	}
-	try{
-		$typeRows = \lib\PayPluginOrder::sortEnabledPayTypeRows($typeRows);
-	}catch(\Throwable $e){
-		// 排序异常时保持数据库顺序，避免首页统计 500
-	}
 	$paytype = [];
-	$paytype_typename = [];
-	foreach($typeRows as $row){
-		if(!isset($row['id'], $row['name'], $row['showname'])){
-			continue;
+	$rs = $DB->getAll("SELECT id,name,showname FROM pre_type WHERE status=1");
+	if(is_array($rs)){
+		foreach($rs as $row){
+			if(!isset($row['id'], $row['showname'])){
+				continue;
+			}
+			$paytype[$row['id']] = $row['showname'];
 		}
-		$paytype[$row['id']] = $row['showname'];
-		$paytype_typename[$row['id']] = $row['name'];
 	}
-	unset($typeRows);
+	unset($rs);
 
-	$chRows = $DB->getAll("SELECT A.id,A.name,A.plugin,B.name typename FROM pre_channel A LEFT JOIN pre_type B ON A.type=B.id WHERE A.status=1");
-	if(!is_array($chRows)){
-		$chRows = [];
-	}
-	try{
-		$chRows = \lib\PayPluginOrder::sortChannelRows($chRows);
-	}catch(\Throwable $e){
-	}
 	$channel = [];
-	$channel_typename = [];
-	foreach($chRows as $row){
-		if(!isset($row['id'], $row['name'])){
-			continue;
+	$rs = $DB->getAll("SELECT id,name FROM pre_channel WHERE status=1");
+	if(is_array($rs)){
+		foreach($rs as $row){
+			if(!isset($row['id'], $row['name'])){
+				continue;
+			}
+			$channel[$row['id']] = $row['name'];
 		}
-		$channel[$row['id']] = $row['name'];
-		$channel_typename[$row['id']] = isset($row['typename']) && $row['typename'] !== null ? $row['typename'] : '';
 	}
-	unset($chRows);
+	unset($rs);
 
 	$tongji_cachetime=getSetting('tongji_cachetime', true);
 	$tongji_cache = $CACHE->read('tongji');
@@ -76,7 +61,7 @@ case 'getcount':
 		if(!is_array($array)){
 			$array = ['usermoney'=>0,'settlemoney'=>0,'order_today'=>['all'=>0,'profit_all'=>0,'paytype'=>[],'channel'=>[],'profit_paytype'=>[]]];
 		}
-		$result=["code"=>0,"type"=>"cache","paytype"=>$paytype,"paytype_typename"=>$paytype_typename,"channel"=>$channel,"channel_typename"=>$channel_typename,"count1"=>$count1,"count2"=>$count2,"usermoney"=>round(floatval($array['usermoney'] ?? 0),2),"settlemoney"=>round(floatval($array['settlemoney'] ?? 0),2),"success_rate"=>$success_rate,"order_today"=>$array['order_today'] ?? ['all'=>0,'profit_all'=>0,'paytype'=>[],'channel'=>[],'profit_paytype'=>[]],"order"=>[]];
+		$result=["code"=>0,"type"=>"cache","paytype"=>$paytype,"channel"=>$channel,"count1"=>$count1,"count2"=>$count2,"usermoney"=>round(floatval($array['usermoney'] ?? 0),2),"settlemoney"=>round(floatval($array['settlemoney'] ?? 0),2),"success_rate"=>$success_rate,"order_today"=>$array['order_today'] ?? ['all'=>0,'profit_all'=>0,'paytype'=>[],'channel'=>[],'profit_paytype'=>[]],"order"=>[]];
 	}else{
 		$usermoney=$DB->getColumn("SELECT SUM(money) FROM pre_user WHERE money!='0.00'");
 		$settlemoney=$DB->getColumn("SELECT SUM(money) FROM pre_settle");
@@ -139,7 +124,7 @@ case 'getcount':
 		saveSetting('tongji_cachetime',time());
 		$CACHE->save('tongji',serialize(["usermoney"=>$usermoney,"settlemoney"=>$settlemoney,"order_today"=>$order_today]));
 
-		$result=["code"=>0,"type"=>"online","paytype"=>$paytype,"paytype_typename"=>$paytype_typename,"channel"=>$channel,"channel_typename"=>$channel_typename,"count1"=>$count1,"count2"=>$count2,"usermoney"=>round($usermoney,2),"settlemoney"=>round($settlemoney,2),"success_rate"=>$success_rate,"order_today"=>$order_today,"order"=>[]];
+		$result=["code"=>0,"type"=>"online","paytype"=>$paytype,"channel"=>$channel,"count1"=>$count1,"count2"=>$count2,"usermoney"=>round($usermoney,2),"settlemoney"=>round($settlemoney,2),"success_rate"=>$success_rate,"order_today"=>$order_today,"order"=>[]];
 	}
 	for($i=1;$i<7;$i++){
 		$day = date("Ymd", strtotime("-{$i} day"));

@@ -13,9 +13,6 @@ if($conf['admin_pwd']==='123456'){
 ?>
 <div class="container" style="padding-top:70px;">
 <div class="col-xs-12 col-lg-9 center-block" style="float: none;">
-<style>
-.stat-type-ico{width:16px;height:16px;margin:-2px 4px 0 0;vertical-align:middle;}
-</style>
 <div id="browser-notice"></div>
 
 <div class="row">
@@ -79,14 +76,6 @@ if($conf['admin_pwd']==='123456'){
 $(document).ready(function(){
 	getData();
 });
-function statTypeIconHtml(tn){
-	if(!tn || !/^[a-zA-Z0-9_.]+$/.test(tn)) return '';
-	return '<img src="/assets/icon/'+tn+'.ico" class="stat-type-ico" onerror="this.style.display=\'none\'" alt="">';
-}
-function statThLabelHtml(tn, text){
-	var esc = $('<span/>').text(text).html();
-	return statTypeIconHtml(tn)+esc;
-}
 function getData(getnew){
 	getnew = getnew || false;
 	$('#title').html('正在加载数据中...');
@@ -108,8 +97,7 @@ function getData(getnew){
 			var paytype=new Array();
 			$.each(data.paytype, function(k, v){
 				paytype.push(k);
-				var tn = (data.paytype_typename && data.paytype_typename[k]) ? data.paytype_typename[k] : '';
-				$("#paytype_head").append('<th>'+statThLabelHtml(tn, v)+'</th>');
+				$("#paytype_head").append('<th>'+$('<span/>').text(v).html()+'</th>');
 			});
 			$("#paytype_head").append('<th>总计</th>');
 			var order = '';
@@ -132,8 +120,7 @@ function getData(getnew){
 			var channel=new Array();
 			$.each(data.channel, function(k, v){
 				channel.push(k);
-				var tn = (data.channel_typename && data.channel_typename[k]) ? data.channel_typename[k] : '';
-				$("#channel_head").append('<th>'+statThLabelHtml(tn, v)+'</th>');
+				$("#channel_head").append('<th>'+$('<span/>').text(v).html()+'</th>');
 			});
 			$("#channel_head").append('<th>总计</th>');
 			var order = '';
@@ -156,8 +143,7 @@ function getData(getnew){
 			var paytype=new Array();
 			$.each(data.paytype, function(k, v){
 				paytype.push(k);
-				var tn = (data.paytype_typename && data.paytype_typename[k]) ? data.paytype_typename[k] : '';
-				$("#profit_paytype_head").append('<th>'+statThLabelHtml(tn, v)+'</th>');
+				$("#profit_paytype_head").append('<th>'+$('<span/>').text(v).html()+'</th>');
 			});
 			$("#profit_paytype_head").append('<th>总计</th>');
 			var order = '';
