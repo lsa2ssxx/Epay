@@ -336,6 +336,7 @@ function loadChannelGroupedTables() {
 					pageNumber: 1,
 					pageSize: 15,
 					sidePagination: 'client',
+					sortable: false,
 					classes: 'table table-striped table-hover table-bordered',
 					columns: getChannelTableColumns(),
 					toolbar: false,

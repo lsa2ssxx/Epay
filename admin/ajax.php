@@ -30,25 +30,31 @@ case 'getcount':
 		}
 	}
 
+	$typeRows = $DB->getAll("SELECT id,name,showname FROM pre_type WHERE status=1 ORDER BY id ASC");
+	$typeRows = \lib\PayPluginOrder::sortEnabledPayTypeRows($typeRows);
 	$paytype = [];
-	$rs = $DB->getAll("SELECT id,name,showname FROM pre_type WHERE status=1");
-	foreach($rs as $row){
+	$paytype_typename = [];
+	foreach($typeRows as $row){
 		$paytype[$row['id']] = $row['showname'];
+		$paytype_typename[$row['id']] = $row['name'];
 	}
-	unset($rs);
+	unset($typeRows);
 
+	$chRows = $DB->getAll("SELECT A.id,A.name,A.plugin,B.name typename FROM pre_channel A LEFT JOIN pre_type B ON A.type=B.id WHERE A.status=1");
+	$chRows = \lib\PayPluginOrder::sortChannelRows($chRows);
 	$channel = [];
-	$rs = $DB->getAll("SELECT id,name FROM pre_channel WHERE status=1");
-	foreach($rs as $row){
+	$channel_typename = [];
+	foreach($chRows as $row){
 		$channel[$row['id']] = $row['name'];
+		$channel_typename[$row['id']] = $row['typename'] !== null ? $row['typename'] : '';
 	}
-	unset($rs);
+	unset($chRows);
 
 	$tongji_cachetime=getSetting('tongji_cachetime', true);
 	$tongji_cache = $CACHE->read('tongji');
 	if($tongji_cachetime+3600>=time() && $tongji_cache && !isset($_GET['getnew'])){
 		$array = unserialize($tongji_cache);
-		$result=["code"=>0,"type"=>"cache","paytype"=>$paytype,"channel"=>$channel,"count1"=>$count1,"count2"=>$count2,"usermoney"=>round($array['usermoney'],2),"settlemoney"=>round($array['settlemoney'],2),"success_rate"=>$success_rate,"order_today"=>$array['order_today'],"order"=>[]];
+		$result=["code"=>0,"type"=>"cache","paytype"=>$paytype,"paytype_typename"=>$paytype_typename,"channel"=>$channel,"channel_typename"=>$channel_typename,"count1"=>$count1,"count2"=>$count2,"usermoney"=>round($array['usermoney'],2),"settlemoney"=>round($array['settlemoney'],2),"success_rate"=>$success_rate,"order_today"=>$array['order_today'],"order"=>[]];
 	}else{
 		$usermoney=$DB->getColumn("SELECT SUM(money) FROM pre_user WHERE money!='0.00'");
 		$settlemoney=$DB->getColumn("SELECT SUM(money) FROM pre_settle");
@@ -97,7 +103,7 @@ case 'getcount':
 		saveSetting('tongji_cachetime',time());
 		$CACHE->save('tongji',serialize(["usermoney"=>$usermoney,"settlemoney"=>$settlemoney,"order_today"=>$order_today]));
 
-		$result=["code"=>0,"type"=>"online","paytype"=>$paytype,"channel"=>$channel,"count1"=>$count1,"count2"=>$count2,"usermoney"=>round($usermoney,2),"settlemoney"=>round($settlemoney,2),"success_rate"=>$success_rate,"order_today"=>$order_today,"order"=>[]];
+		$result=["code"=>0,"type"=>"online","paytype"=>$paytype,"paytype_typename"=>$paytype_typename,"channel"=>$channel,"channel_typename"=>$channel_typename,"count1"=>$count1,"count2"=>$count2,"usermoney"=>round($usermoney,2),"settlemoney"=>round($settlemoney,2),"success_rate"=>$success_rate,"order_today"=>$order_today,"order"=>[]];
 	}
 	for($i=1;$i<7;$i++){
 		$day = date("Ymd", strtotime("-{$i} day"));
