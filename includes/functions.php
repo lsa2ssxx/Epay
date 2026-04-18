@@ -902,11 +902,24 @@ function is_idcard( $id )
 }
 
 function checkRefererHost(){
-	if(!$_SERVER['HTTP_REFERER'])return false;
-	$url_arr = parse_url($_SERVER['HTTP_REFERER']);
-	$http_host = $_SERVER['HTTP_HOST'];
-	if(strpos($http_host,':'))$http_host = substr($http_host, 0, strpos($http_host, ':'));
-	return $url_arr['host'] === $http_host;
+	$http_host = $_SERVER['HTTP_HOST'] ?? '';
+	if(strpos($http_host, ':') !== false){
+		$http_host = substr($http_host, 0, strpos($http_host, ':'));
+	}
+	if(!empty($_SERVER['HTTP_REFERER'])){
+		$url_arr = parse_url($_SERVER['HTTP_REFERER']);
+		if(!empty($url_arr['host']) && $url_arr['host'] === $http_host){
+			return true;
+		}
+	}
+	// 部分前端 fetch 会带 Origin、不带 Referer；同源则放行（地址栏直开仍无 Origin，保持拦截）
+	if(!empty($_SERVER['HTTP_ORIGIN'])){
+		$o = parse_url($_SERVER['HTTP_ORIGIN']);
+		if(!empty($o['host']) && $o['host'] === $http_host){
+			return true;
+		}
+	}
+	return false;
 }
 function randFloat($min=0, $max=1){
 	return $min + mt_rand()/mt_getrandmax() * ($max-$min);
