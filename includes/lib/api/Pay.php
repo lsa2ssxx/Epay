@@ -36,7 +36,8 @@ class Pay
 
         if($userrow['pay']==2 && $conf['user_review']==1)sysmsg('商户未通过审核，无法支付！');
 
-        $type=daddslashes($queryArr['type']);
+        // 第三方调用收银台时，统一忽略商户传入的 type 等支付方式参数，强制走收银台让用户选择
+        $type='';
         $out_trade_no=daddslashes($queryArr['out_trade_no']);
         $notify_url=htmlspecialchars(daddslashes($queryArr['notify_url']));
         $return_url=htmlspecialchars(daddslashes($queryArr['return_url']));
