@@ -104,10 +104,24 @@ $order['typename'] = $submitData['typename'];
 $order['plugin'] = $submitData['plugin'];
 $order['profits'] = \lib\Payment::updateOrderProfits($order, $submitData['plugin']);
 
+// Coinify 风格全局壳注入：把 X / ? / Footer / Drawer / Leave Modal 自动叠加到任意插件页面
+require_once SYSTEM_ROOT.'pages/cashier_shell_inject.php';
+$cm_addtime_ts_s2 = isset($order['addtime']) ? strtotime($order['addtime']) : 0;
+$cm_lifetime_s2 = isset($conf['order_lifetime']) && (int)$conf['order_lifetime'] > 0 ? (int)$conf['order_lifetime'] : 1800;
+cm_shell_start([
+	'site_name'  => isset($conf['sitename']) ? $conf['sitename'] : '',
+	'return_url' => isset($order['return_url']) ? $order['return_url'] : '/',
+	'expire_at'  => $cm_addtime_ts_s2 > 0 ? $cm_addtime_ts_s2 + $cm_lifetime_s2 : 0,
+]);
+
 try{
 	$result = \lib\Plugin::loadForSubmit($submitData['plugin'], $trade_no);
 	$result['submit'] = true;
 	\lib\Payment::echoDefault($result);
 }catch(Exception $e){
+	cm_shell_finish();
 	sysmsg($e->getMessage());
+	exit;
 }
+
+cm_shell_finish();
