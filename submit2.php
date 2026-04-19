@@ -15,11 +15,25 @@ if($order['status']>0){
 }
 $firstGetChannel = true;
 if($order['type'] > 0 && $order['channel'] > 0 && $order['realmoney'] > 0 && $order['getmoney'] > 0){
-	$firstGetChannel = false;
-	if($typeid != $order['type']){
-		sysmsg('该订单已选择支付方式，如需更换其他支付方式请返回网站重新下单');
+	if($typeid > 0 && $typeid != $order['type']){
+		// 用户在收银台重新选择了不同的支付方式：清空已分配的通道，按新选择重新走一遍流程
+		$DB->update('order', [
+			'type' => 0,
+			'channel' => 0,
+			'subchannel' => '',
+			'realmoney' => 0,
+			'getmoney' => 0,
+		], ['trade_no' => $trade_no]);
+		$order['type'] = 0;
+		$order['channel'] = 0;
+		$order['subchannel'] = '';
+		$order['realmoney'] = 0;
+		$order['getmoney'] = 0;
+		$firstGetChannel = true;
+	}else{
+		$firstGetChannel = false;
+		$typeid = $order['type'];
 	}
-	$typeid = $order['type'];
 }
 
 // 获取订单支付方式ID、支付插件、支付通道、支付费率
