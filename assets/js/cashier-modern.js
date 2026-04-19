@@ -216,6 +216,69 @@
 		});
 	}
 
+	/* ---------- QR Receive Page ---------- */
+	function pad2(n) { n = String(n); return n.length < 2 ? '0' + n : n; }
+
+	function fmtCountdown(remain) {
+		if (remain < 0) remain = 0;
+		var m = Math.floor(remain / 60);
+		var s = remain % 60;
+		if (m >= 60) {
+			var h = Math.floor(m / 60);
+			m = m % 60;
+			return pad2(h) + ':' + pad2(m) + ':' + pad2(s);
+		}
+		return pad2(m) + ':' + pad2(s);
+	}
+
+	function truncateMid(text, head, tail) {
+		text = String(text || '');
+		head = head || 6;
+		tail = tail || 4;
+		if (text.length <= head + tail + 3) return text;
+		return text.slice(0, head) + ' … ' + text.slice(-tail);
+	}
+
+	function initQrDetails() {
+		var box = $('#cm-qr-details');
+		if (!box) return;
+		var head = $('.cm-qr-details-head', box);
+		if (!head) return;
+		head.addEventListener('click', function (e) {
+			if (e.target.closest && e.target.closest('[data-copy]')) return;
+			box.classList.toggle('is-open');
+		});
+	}
+
+	function initQrCountdown() {
+		var node = $('#cm-qr-countdown');
+		if (!node) return;
+		var expireAt = (window.CM_CONFIG && window.CM_CONFIG.expireAt) || 0;
+		if (!expireAt) { node.textContent = '--:--'; return; }
+		function tick() {
+			var remain = expireAt - Math.floor(Date.now() / 1000);
+			if (remain <= 0) {
+				node.textContent = '00:00';
+				node.classList.add('is-warning');
+				return;
+			}
+			node.textContent = fmtCountdown(remain);
+			if (remain < 120) node.classList.add('is-warning');
+		}
+		tick();
+		setInterval(tick, 1000);
+	}
+
+	function initQrTruncate() {
+		$$('[data-truncate]').forEach(function (el) {
+			var src = el.getAttribute('data-truncate');
+			if (!src) return;
+			var head = parseInt(el.getAttribute('data-truncate-head') || '6', 10);
+			var tail = parseInt(el.getAttribute('data-truncate-tail') || '4', 10);
+			el.textContent = truncateMid(src, head, tail);
+		});
+	}
+
 	/* ---------- boot ---------- */
 	function ready(fn) {
 		if (doc.readyState !== 'loading') fn();
@@ -230,5 +293,8 @@
 		initRefresh();
 		initExpire();
 		initCopy();
+		initQrDetails();
+		initQrCountdown();
+		initQrTruncate();
 	});
 })();

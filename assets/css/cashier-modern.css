@@ -545,6 +545,235 @@
 	transform: translateX(-50%) translateY(0);
 }
 
+/* ---------- QR Receive Page (alipay_qrcode etc.) ---------- */
+.cm-qr-shell {
+	max-width: 520px;
+	margin: 8px auto 0;
+	padding: 0 4px;
+}
+
+.cm-qr-header {
+	position: relative;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	height: 44px;
+	margin: 4px 0 8px;
+}
+.cm-qr-back {
+	position: absolute;
+	left: 0;
+	top: 50%;
+	transform: translateY(-50%);
+	width: 36px;
+	height: 36px;
+	border: none;
+	background: transparent;
+	color: var(--cm-text);
+	cursor: pointer;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: 50%;
+	transition: background-color 0.15s ease;
+}
+.cm-qr-back:hover { background: var(--cm-secondary-bg); }
+.cm-qr-back svg { width: 22px; height: 22px; }
+.cm-qr-merchant {
+	font-size: 16px;
+	font-weight: 700;
+	letter-spacing: 0.04em;
+	color: var(--cm-text);
+	text-transform: uppercase;
+	text-align: center;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	max-width: 60%;
+}
+
+.cm-qr-subtitle {
+	text-align: center;
+	color: var(--cm-text-muted);
+	font-size: 13px;
+	margin: 0 0 18px;
+	line-height: 1.5;
+}
+
+.cm-qr-card {
+	background: var(--cm-surface);
+	border-radius: var(--cm-radius-lg);
+	box-shadow: var(--cm-shadow-md);
+	padding: 18px 18px 6px;
+}
+
+.cm-qr-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	padding: 12px 0;
+	border-bottom: 1px solid var(--cm-border);
+}
+.cm-qr-row:last-child { border-bottom: none; }
+.cm-qr-row-label { color: var(--cm-text-muted); font-size: 13px; }
+.cm-qr-row-value {
+	color: var(--cm-text);
+	font-size: 14px;
+	font-weight: 500;
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	max-width: 70%;
+	text-align: right;
+}
+.cm-qr-row-value .cm-qr-amount-num {
+	font-size: 16px;
+	font-weight: 600;
+}
+.cm-qr-currency-badge {
+	width: 22px;
+	height: 22px;
+	border-radius: 50%;
+	background: #00a0e9;
+	color: #fff;
+	font-size: 11px;
+	font-weight: 700;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+}
+.cm-qr-network-icon {
+	width: 18px;
+	height: 18px;
+	border-radius: 50%;
+	overflow: hidden;
+	display: inline-block;
+	background: var(--cm-icon-bg);
+	flex-shrink: 0;
+}
+.cm-qr-network-icon img { width: 100%; height: 100%; object-fit: contain; }
+.cm-qr-addr-btn {
+	border: none;
+	background: transparent;
+	cursor: pointer;
+	color: var(--cm-text-muted);
+	padding: 2px;
+	display: inline-flex;
+	align-items: center;
+	border-radius: 4px;
+	transition: color 0.15s ease, background-color 0.15s ease;
+}
+.cm-qr-addr-btn:hover { color: var(--cm-text); background: var(--cm-secondary-bg); }
+.cm-qr-addr-btn svg { width: 16px; height: 16px; }
+
+.cm-qr-canvas {
+	margin: 22px auto 14px;
+	width: 220px;
+	height: 220px;
+	background: #fff;
+	border-radius: var(--cm-radius-md);
+	padding: 10px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	position: relative;
+	box-shadow: 0 0 0 1px var(--cm-border);
+}
+.cm-qr-canvas canvas,
+.cm-qr-canvas img { display: block; max-width: 100%; height: auto; }
+.cm-qr-canvas-logo {
+	position: absolute;
+	left: 50%;
+	top: 50%;
+	transform: translate(-50%, -50%);
+	width: 36px;
+	height: 36px;
+	border-radius: 50%;
+	background: #fff;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	box-shadow: 0 0 0 3px #fff;
+}
+.cm-qr-canvas-logo img { width: 28px; height: 28px; }
+
+.cm-qr-warning {
+	display: flex;
+	align-items: flex-start;
+	gap: 10px;
+	background: var(--cm-warning-bg);
+	border: 1px solid var(--cm-warning-border);
+	color: var(--cm-warning-text);
+	border-radius: var(--cm-radius-md);
+	padding: 10px 12px;
+	font-size: 12px;
+	line-height: 1.55;
+	margin: 6px 0 14px;
+}
+.cm-qr-warning .cm-qr-warning-ico {
+	flex-shrink: 0;
+	width: 18px;
+	height: 18px;
+	margin-top: 1px;
+}
+.cm-qr-warning a { color: inherit; text-decoration: underline; }
+
+/* Details (collapsible card) */
+.cm-qr-details {
+	background: var(--cm-surface);
+	border-radius: var(--cm-radius-lg);
+	box-shadow: var(--cm-shadow-md);
+	margin-top: 14px;
+	overflow: hidden;
+}
+.cm-qr-details-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	padding: 14px 18px;
+	cursor: pointer;
+	color: var(--cm-text);
+	user-select: none;
+}
+.cm-qr-details-head .cm-qr-details-title {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	font-size: 14px;
+	font-weight: 600;
+}
+.cm-qr-details-head .cm-qr-details-arrow {
+	width: 16px;
+	height: 16px;
+	transition: transform 0.2s ease;
+	color: var(--cm-text-muted);
+}
+.cm-qr-details.is-open .cm-qr-details-arrow { transform: rotate(180deg); }
+.cm-qr-countdown {
+	font-size: 13px;
+	color: var(--cm-text-muted);
+	font-variant-numeric: tabular-nums;
+}
+.cm-qr-countdown.is-warning { color: #c2410c; }
+.cm-qr-details-body {
+	display: none;
+	padding: 4px 18px 14px;
+	border-top: 1px solid var(--cm-border);
+}
+.cm-qr-details.is-open .cm-qr-details-body { display: block; }
+.cm-qr-details-body .cm-qr-row { padding: 10px 0; }
+
+/* Mobile-only "open Alipay app" buttons */
+.cm-qr-actions {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	margin-top: 16px;
+}
+.cm-qr-actions .cm-btn { width: 100%; }
+
 /* ---------- Responsive ---------- */
 @media (max-width: 540px) {
 	.cm-shell { margin-top: 8px; }
@@ -554,4 +783,6 @@
 	.cm-close-btn { top: 10px; right: 10px; }
 	.cm-help-btn { right: 14px; bottom: 14px; }
 	.cm-footer { font-size: 10px; }
+	.cm-qr-merchant { font-size: 14px; }
+	.cm-qr-canvas { width: 200px; height: 200px; }
 }
