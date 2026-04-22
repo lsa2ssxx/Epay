@@ -178,6 +178,10 @@ class Payment {
                     $json['pay_type'] = 'wxapp';
                     $json['pay_info'] = $result['data'];
                     break;
+                case 'crypto': //加密货币支付（地址/金额/二维码）
+                    $json['pay_type'] = 'crypto';
+                    $json['pay_info'] = $result['data'];
+                    break;
                 case 'error':
                     $json['code'] = -2;
                     $json['msg'] = $result['msg'];
@@ -219,6 +223,9 @@ class Payment {
                     break;
                 case 'scheme': //小程序H5跳转
                     $json['urlscheme'] = $result['url'];
+                    break;
+                case 'crypto': //加密货币支付（地址/金额/二维码）
+                    $json['crypto'] = $result['data'];
                     break;
                 case 'error':
                     $json['code'] = -2;

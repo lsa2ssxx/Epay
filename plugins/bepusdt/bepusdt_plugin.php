@@ -57,6 +57,15 @@ class bepusdt_plugin
                 'type' => 'input',
                 'note' => '可以留空 例如：7.4 ~1.02 ~0.98（不明白切勿乱填）',
             ],
+            'unified_cashier' => [
+                'name' => '统一收银台',
+                'type' => 'select',
+                'options' => [
+                    '0' => '关闭（跳转 BEpusdt 官方收银页）',
+                    '1' => '开启（在本站内渲染地址+金额+二维码）',
+                ],
+                'note' => '开启后：下单后直接在本站收银台展示收款地址与金额，保持站点品牌与 UI 一致；回调链路不变。',
+            ],
         ],
         'select'   => null,
         'note'     => '', //支付密钥填写说明
@@ -146,7 +155,91 @@ class bepusdt_plugin
             return ['type' => 'error', 'msg' => '请求失败，错误信息：' . $data['message']];
         }
 
-        return ['type' => 'jump', 'url' => $data['data']['payment_url']];
+        $payload = is_array($data['data']) ? $data['data'] : [];
+        $payment_url = $payload['payment_url'] ?? '';
+
+        // 统一收银台：保留完整支付上下文并渲染站内页面
+        if (!empty($channel['unified_cashier'])) {
+            $payinfo = self::_buildUnifiedPayInfo($payload, $trade_type ?? '');
+            \lib\Payment::updateOrderExt(TRADE_NO, $payinfo);
+            if (!empty($payload['trade_id'])) {
+                \lib\Payment::updateOrder(TRADE_NO, $payload['trade_id']);
+            }
+
+            return [
+                'type' => 'page',
+                'page' => 'crypto',
+                'data' => self::_unifiedPageData($payinfo),
+            ];
+        }
+
+        return ['type' => 'jump', 'url' => $payment_url];
+    }
+
+    /**
+     * API 模式下，若开启统一收银台则返回 crypto 类型，由 Payment::echoJson 序列化为 pay_info 对象。
+     * 未开启统一收银台时回退为 submit 流程（走站内跳转页）。
+     */
+    public static function mapi(): array
+    {
+        global $channel;
+
+        $result = self::submit();
+        if (!empty($channel['unified_cashier']) && isset($result['type']) && $result['type'] === 'page') {
+            return [
+                'type' => 'crypto',
+                'data' => $result['data'],
+            ];
+        }
+        return $result;
+    }
+
+    /**
+     * 将 BEpusdt 响应整理为统一收银台所需的上下文
+     *
+     * @param array<string, mixed> $payload   BEpusdt /create-transaction 响应的 data 段
+     * @param string               $trade_type 请求时的 trade_type（如 usdt.trc20），用于展示
+     * @return array<string, mixed>
+     */
+    private static function _buildUnifiedPayInfo(array $payload, string $trade_type): array
+    {
+        $currency = $trade_type !== '' ? $trade_type : (string) ($payload['trade_type'] ?? '');
+        $expire_sec = intval($payload['expiration_time'] ?? 0);
+        return [
+            'plugin'        => 'bepusdt',
+            'address'       => (string) ($payload['token'] ?? ''),
+            'amount'        => (string) ($payload['actual_amount'] ?? ''),
+            'currency'      => $currency,
+            'chain'         => '', // BEpusdt 的 trade_type 已包含链信息，chain_label 由前端自行推断
+            'fiat'          => (string) ($payload['fiat'] ?? 'CNY'),
+            'fiat_amount'   => (string) ($payload['amount'] ?? ''),
+            'expire_at'     => $expire_sec > 0 ? time() + $expire_sec : 0,
+            'qrcode'        => '', // BEpusdt 不直接返回二维码图片，前端用地址本地生成
+            'fallback_url'  => (string) ($payload['payment_url'] ?? ''),
+            'api_trade_no'  => (string) ($payload['trade_id'] ?? ''),
+        ];
+    }
+
+    /**
+     * 将扩展数据展开为 type=page 所需的局部变量键
+     *
+     * @param array<string, mixed> $ext
+     * @return array<string, mixed>
+     */
+    private static function _unifiedPageData(array $ext): array
+    {
+        return [
+            'pay_plugin'       => 'BEpusdt',
+            'pay_address'      => $ext['address'] ?? '',
+            'pay_amount'       => $ext['amount'] ?? '',
+            'pay_currency'     => $ext['currency'] ?? '',
+            'pay_chain'        => $ext['chain'] ?? '',
+            'pay_fiat'         => $ext['fiat'] ?? 'CNY',
+            'pay_fiat_amount'  => $ext['fiat_amount'] ?? '',
+            'pay_expire_at'    => (int) ($ext['expire_at'] ?? 0),
+            'pay_qrcode'       => $ext['qrcode'] ?? '',
+            'pay_fallback_url' => $ext['fallback_url'] ?? '',
+        ];
     }
 
     public static function notify()

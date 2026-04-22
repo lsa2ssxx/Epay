@@ -23,6 +23,15 @@ class TokenPay_plugin{
 				'type' => 'input',
 				'note' => 'TokenPay API 密钥',
 			],
+			'unified_cashier' => [
+				'name' => '统一收银台',
+				'type' => 'select',
+				'options' => [
+					'0' => '关闭（跳转 TokenPay 官方收银页）',
+					'1' => '开启（在本站内渲染地址+金额+二维码）',
+				],
+				'note' => '开启后：下单后直接在本站收银台展示收款地址与金额，保持站点品牌与 UI 一致；回调链路不变。',
+			],
 		],
 		'select' => null,
 		'note' => '', //支付密钥填写说明
@@ -32,7 +41,7 @@ class TokenPay_plugin{
 
 	static public function submit(){
 		global $siteurl, $channel, $order, $sitename;
-		
+
 		if(in_array($order['typename'], self::$info['types'])){
 			return ['type'=>'jump','url'=>'/pay/TokenPay/'.TRADE_NO.'/?sitename='.$sitename];
 		}
@@ -42,7 +51,12 @@ class TokenPay_plugin{
 		global $siteurl, $channel, $order, $device, $mdevice;
 
 		if(in_array($order['typename'], self::$info['types'])){
-			return self::TokenPay($order['typename']);
+			$result = self::TokenPay($order['typename']);
+			// 统一收银台场景下，把 type=page 转换为 API 友好的 crypto 响应
+			if(!empty($channel['unified_cashier']) && isset($result['type']) && $result['type'] === 'page'){
+				return ['type'=>'crypto','data'=>$result['data']];
+			}
+			return $result;
 		}
 	}
 
@@ -80,45 +94,127 @@ class TokenPay_plugin{
     
     
     
-	//通用创建订单
+	//通用创建订单（保留原签名：返回 pay URL 字符串，向后兼容调用方）
 	static private function CreateOrder($type, $extra = null){
-		global $siteurl, $channel, $order, $ordername, $conf, $clientip;
-		echo $type;
+		$result = self::CreateOrderRaw($extra);
+		return $result['code_url'];
+	}
+
+	/**
+	 * 调用 TokenPay /CreateOrder 并返回完整上下文
+	 *
+	 * @param array|null $extra 额外参数
+	 * @return array{code_url:string, info:array<string,mixed>, raw:array<string,mixed>}
+	 * @throws Exception
+	 */
+	static private function CreateOrderRaw($extra = null){
+		global $siteurl, $channel, $order, $conf;
+
 		$param = [
-		    'OutOrderId' => TRADE_NO, //外部订单号
-		    'OrderUserKey' => (string)$order['uid'],   //支付用户标识
-		    'ActualAmount' => $order['realmoney'],   //订单实际支付的人民币金额，保留两位小数
-		    'Currency' => $order['typename'],   //加密货币的币种，直接以原样字符串传递即可
-		    'NotifyUrl' => $conf['localurl'].'pay/notify/'.TRADE_NO.'/',  //异步通知URL
-		    'RedirectUrl' => $siteurl.'pay/return/'.TRADE_NO.'/'    //订单支付或过期后跳转的URL
+		    'OutOrderId'   => TRADE_NO,
+		    'OrderUserKey' => (string)$order['uid'],
+		    'ActualAmount' => $order['realmoney'],
+		    'Currency'     => $order['typename'],
+		    'NotifyUrl'    => $conf['localurl'].'pay/notify/'.TRADE_NO.'/',
+		    'RedirectUrl'  => $siteurl.'pay/return/'.TRADE_NO.'/'
 		];
-		
+
 		if($extra){
 			$param = array_merge($param, $extra);
 		}
-        $param['Signature'] = self::Sign($param,$channel['appkey']); //参数签名
+		$param['Signature'] = self::Sign($param,$channel['appkey']);
 
 		$result = self::sendRequest('/CreateOrder', $param, $channel['appkey']);
-		
 
 		if(isset($result["success"]) && $result["success"]){
-			\lib\Payment::updateOrder(TRADE_NO, $result['data']);
 			$code_url = $result['data'];
-		}else{
-			throw new Exception($result["message"]?$result["message"]:'返回数据解析失败');
+			$info = isset($result['info']) && is_array($result['info']) ? $result['info'] : [];
+			// 优先把 TokenPay 内部订单号写入 api_trade_no，便于对账；info 缺失时兜底存 pay URL
+			$api_trade_no = !empty($info['Id']) ? (string)$info['Id'] : (string)$code_url;
+			\lib\Payment::updateOrder(TRADE_NO, $api_trade_no);
+			return ['code_url'=>$code_url, 'info'=>$info, 'raw'=>$result];
 		}
-		return $code_url;
+		throw new Exception($result["message"]?$result["message"]:'返回数据解析失败');
 	}
 
-    
     static public function TokenPay(){
+		global $channel;
+
 		try{
-			$code_url = self::CreateOrder('');
+			$created = self::CreateOrderRaw(null);
 		}catch(Exception $ex){
 			return ['type'=>'error','msg'=>'TokenPay创建订单失败！'.$ex->getMessage()];
 		}
 
-        return ['type'=>'jump','url'=>$code_url];
+		// 统一收银台：站内渲染地址+金额+二维码
+		if(!empty($channel['unified_cashier']) && !empty($created['info'])){
+			$payinfo = self::_buildUnifiedPayInfo($created['info'], $created['code_url']);
+			\lib\Payment::updateOrderExt(TRADE_NO, $payinfo);
+			return [
+				'type' => 'page',
+				'page' => 'crypto',
+				'data' => self::_unifiedPageData($payinfo),
+			];
+		}
+
+        return ['type'=>'jump','url'=>$created['code_url']];
+	}
+
+	/**
+	 * 将 TokenPay /CreateOrder 响应的 info 对象整理为统一收银台上下文
+	 *
+	 * @param array<string,mixed> $info     响应的 info 段（ToAddress/Amount/... 等）
+	 * @param string              $code_url TokenPay 官方 Checkout URL（兜底跳转用）
+	 * @return array<string,mixed>
+	 */
+	static private function _buildUnifiedPayInfo(array $info, string $code_url): array
+	{
+		$expire_at = 0;
+		if(!empty($info['ExpireTime'])){
+			$ts = strtotime((string)$info['ExpireTime']);
+			if($ts > 0) $expire_at = $ts;
+		}
+		$qrcode = '';
+		if(!empty($info['QrCodeBase64'])){
+			$qrcode = (string)$info['QrCodeBase64'];
+		}elseif(!empty($info['QrCodeLink'])){
+			$qrcode = (string)$info['QrCodeLink'];
+		}
+		return [
+			'plugin'       => 'TokenPay',
+			'address'      => (string)($info['ToAddress'] ?? ''),
+			'amount'       => (string)($info['Amount'] ?? ''),
+			'currency'     => (string)($info['CurrencyName'] ?? ($info['Currency'] ?? '')),
+			'chain'        => (string)($info['BlockChainName'] ?? ''),
+			'fiat'         => (string)($info['BaseCurrency'] ?? 'CNY'),
+			'fiat_amount'  => (string)($info['ActualAmount'] ?? ''),
+			'expire_at'    => $expire_at,
+			'qrcode'       => $qrcode,
+			'fallback_url' => $code_url,
+			'api_trade_no' => (string)($info['Id'] ?? ''),
+		];
+	}
+
+	/**
+	 * 扩展数据 → crypto.php 局部变量
+	 *
+	 * @param array<string,mixed> $ext
+	 * @return array<string,mixed>
+	 */
+	static private function _unifiedPageData(array $ext): array
+	{
+		return [
+			'pay_plugin'       => 'TokenPay',
+			'pay_address'      => $ext['address'] ?? '',
+			'pay_amount'       => $ext['amount'] ?? '',
+			'pay_currency'     => $ext['currency'] ?? '',
+			'pay_chain'        => $ext['chain'] ?? '',
+			'pay_fiat'         => $ext['fiat'] ?? 'CNY',
+			'pay_fiat_amount'  => $ext['fiat_amount'] ?? '',
+			'pay_expire_at'    => (int)($ext['expire_at'] ?? 0),
+			'pay_qrcode'       => $ext['qrcode'] ?? '',
+			'pay_fallback_url' => $ext['fallback_url'] ?? '',
+		];
 	}
 
 	//异步回调
