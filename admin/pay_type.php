@@ -4,6 +4,7 @@
 **/
 include("../includes/common.php");
 include_once SYSTEM_ROOT.'pay_type_crypto_sort.php';
+include_once SYSTEM_ROOT.'pay_type_category.php';
 $title='支付方式';
 include './head.php';
 if($islogin==1){}else exit("<script language='javascript'>window.location.href='./login.php';</script>");
@@ -59,7 +60,21 @@ function pay_type_render_rows($rows){
 		}
 		$nameDisp = htmlspecialchars($res['name'], ENT_QUOTES, 'UTF-8');
 		$shownameDisp = htmlspecialchars($res['showname'], ENT_QUOTES, 'UTF-8');
-		echo '<tr><td><b>'.$nameDisp.'</b></td><td>'.pay_type_icon_html($res['name'], 'type-logo').$shownameDisp.$pluginNote.'</td><td>'.display_device($res['device']).'</td><td><a onclick="getAll(0,'.$res['id'].',this)" title="点此获取最新数据">[刷新]</a></td><td>'.($res['status']==1?'<a class="btn btn-xs btn-success" onclick="setStatus('.$res['id'].',0)">已开启</a>':'<a class="btn btn-xs btn-warning" onclick="setStatus('.$res['id'].',1)">已关闭</a>').'</td><td><a class="btn btn-xs btn-info" onclick="editframe('.$res['id'].')">编辑</a>&nbsp;<a class="btn btn-xs btn-danger" onclick="delItem('.$res['id'].')">删除</a>&nbsp;<a href="./order.php?type='.$res['id'].'" target="_blank" class="btn btn-xs btn-default">订单</a></td></tr>';
+		$resolved = pay_type_category_resolve($res);
+		$cur_set = trim((string)($res['currency'] ?? '')) !== '';
+		$net_set = trim((string)($res['network'] ?? '')) !== '';
+		$cur_h = htmlspecialchars($resolved['currency'], ENT_QUOTES, 'UTF-8');
+		$net_h = $resolved['network'] !== null ? htmlspecialchars($resolved['network'], ENT_QUOTES, 'UTF-8') : '<span class="text-muted">—</span>';
+		$cur_label = $cur_set
+			? '<span class="label label-info" title="管理员设置">'.$cur_h.'</span>'
+			: '<span class="label label-default" title="按调用值自动推导">'.$cur_h.'</span>';
+		$net_label = !$net_set && $resolved['network'] === null
+			? $net_h
+			: ($net_set
+				? '<span class="label label-primary" title="管理员设置">'.$net_h.'</span>'
+				: '<span class="label label-default" title="按调用值自动推导">'.$net_h.'</span>');
+		$catCell = '<div style="white-space:nowrap;font-size:12px;line-height:1.8;">'.$cur_label.' '.$net_label.'</div>';
+		echo '<tr><td><b>'.$nameDisp.'</b></td><td>'.pay_type_icon_html($res['name'], 'type-logo').$shownameDisp.$pluginNote.'</td><td>'.$catCell.'</td><td>'.display_device($res['device']).'</td><td><a onclick="getAll(0,'.$res['id'].',this)" title="点此获取最新数据">[刷新]</a></td><td>'.($res['status']==1?'<a class="btn btn-xs btn-success" onclick="setStatus('.$res['id'].',0)">已开启</a>':'<a class="btn btn-xs btn-warning" onclick="setStatus('.$res['id'].',1)">已关闭</a>').'</td><td><a class="btn btn-xs btn-info" onclick="editframe('.$res['id'].')">编辑</a>&nbsp;<a class="btn btn-xs btn-danger" onclick="delItem('.$res['id'].')">删除</a>&nbsp;<a href="./order.php?type='.$res['id'].'" target="_blank" class="btn btn-xs btn-default">订单</a></td></tr>';
 	}
 }
 
@@ -200,6 +215,11 @@ if (count($bucket_other) > 0) {
 						</div>
 					</div>
 					<div class="form-group">
+						<div class="col-sm-offset-2 col-sm-10">
+							<p class="help-block" style="margin:0 0 4px;">收银台三级菜单（币种 → 网络 → 通道）依据下面 4 个字段分组与排序，留空时按「调用值」自动推导。</p>
+						</div>
+					</div>
+					<div class="form-group">
 						<label class="col-sm-2 control-label no-padding-right">币种分类</label>
 						<div class="col-sm-10">
 							<input type="text" class="form-control" name="currency" id="currency" placeholder="如 USDT/USDC/Alipay/WeChat，留空将自动从调用值推导" maxlength="30">
@@ -242,7 +262,7 @@ if (count($bucket_other) > 0) {
    <div class="panel-heading"><h3 class="panel-title">系统共有 <b><?php echo count($list);?></b> 个支付方式（按支付插件归类）&nbsp;<span class="pull-right"><a href="javascript:addframe()" class="btn btn-default btn-xs"><i class="fa fa-plus"></i> 新增</a></span></h3></div>
 </div>
 <?php
-$tableHead = '<div class="table-responsive"><table class="table table-striped"><thead><tr><th>调用值</th><th>名称</th><th>支持设备</th><th>今日收款</th><th>状态</th><th>操作</th></tr></thead><tbody>';
+$tableHead = '<div class="table-responsive"><table class="table table-striped"><thead><tr><th>调用值</th><th>名称</th><th>币种 / 网络</th><th>支持设备</th><th>今日收款</th><th>状态</th><th>操作</th></tr></thead><tbody>';
 $tableFoot = '</tbody></table></div>';
 if(count($bucket_common) > 0){
 	echo '<div class="panel panel-default type-plugin-panel"><div class="panel-heading"><strong>通用支付方式</strong>（被 2 个及以上支付插件声明）</div><div class="panel-body" style="padding:0">'.$tableHead;
