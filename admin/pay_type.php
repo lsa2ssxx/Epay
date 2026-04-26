@@ -199,6 +199,35 @@ if (count($bucket_other) > 0) {
 							</select>
 						</div>
 					</div>
+					<div class="form-group">
+						<label class="col-sm-2 control-label no-padding-right">币种分类</label>
+						<div class="col-sm-10">
+							<input type="text" class="form-control" name="currency" id="currency" placeholder="如 USDT/USDC/Alipay/WeChat，留空将自动从调用值推导" maxlength="30">
+						</div>
+					</div>
+					<div class="form-group">
+						<label class="col-sm-2 control-label no-padding-right">网络</label>
+						<div class="col-sm-10">
+							<input type="text" class="form-control" name="network" id="network" placeholder="加密货币填写链名（如 TRC20/ERC20/Polygon），法币留空" maxlength="30">
+						</div>
+					</div>
+					<div class="row">
+					<div class="col-sm-6">
+					<div class="form-group">
+						<label class="col-sm-4 control-label no-padding-right">币种排序</label>
+						<div class="col-sm-8">
+							<input type="number" class="form-control" name="currency_sort" id="currency_sort" placeholder="0=默认" min="0">
+						</div>
+					</div>
+					</div><div class="col-sm-6">
+					<div class="form-group">
+						<label class="col-sm-4 control-label no-padding-right">网络排序</label>
+						<div class="col-sm-8">
+							<input type="number" class="form-control" name="network_sort" id="network_sort" placeholder="0=默认" min="0">
+						</div>
+					</div>
+					</div>
+					</div>
 				</form>
 			</div>
 			<div class="modal-footer">
@@ -249,6 +278,10 @@ function addframe(){
 	$("#name").val('');
 	$("#showname").val('');
 	$("#device").val(0);
+	$("#currency").val('');
+	$("#network").val('');
+	$("#currency_sort").val(0);
+	$("#network_sort").val(0);
 }
 function editframe(id){
 	var ii = layer.load(2, {shade:[0.1,'#fff']});
@@ -266,6 +299,10 @@ function editframe(id){
 				$("#name").val(data.data.name);
 				$("#showname").val(data.data.showname);
 				$("#device").val(data.data.device);
+				$("#currency").val(data.data.currency || '');
+				$("#network").val(data.data.network || '');
+				$("#currency_sort").val(data.data.currency_sort || 0);
+				$("#network_sort").val(data.data.network_sort || 0);
 			}else{
 				layer.alert(data.msg, {icon: 2})
 			}

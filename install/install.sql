@@ -91,6 +91,10 @@ CREATE TABLE `pre_type` (
   `device` int(1) unsigned NOT NULL DEFAULT '0',
   `showname` varchar(30) NOT NULL,
   `status` tinyint(1) NOT NULL DEFAULT '0',
+  `currency` varchar(30) DEFAULT NULL,
+  `network` varchar(30) DEFAULT NULL,
+  `currency_sort` int(11) NOT NULL DEFAULT 0,
+  `network_sort` int(11) NOT NULL DEFAULT 0,
  PRIMARY KEY (`id`),
  KEY `name` (`name`,`device`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;

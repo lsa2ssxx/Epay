@@ -245,6 +245,38 @@
 }
 .cm-item.is-disabled { opacity: 0.55; cursor: not-allowed; }
 .cm-item.is-disabled:hover { background: transparent; }
+a.cm-item, a.cm-item:hover { text-decoration: none; color: inherit; }
+.cm-item-chev {
+	flex-shrink: 0;
+	width: 16px;
+	height: 16px;
+	color: var(--cm-text-soft);
+	margin-left: 4px;
+	transition: transform 0.15s ease, color 0.15s ease;
+}
+.cm-item:hover .cm-item-chev { color: var(--cm-text-muted); transform: translateX(2px); }
+
+/* ---------- Page Head (Back to upper level) ---------- */
+.cm-page-head {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin: 4px 0 8px;
+}
+.cm-back-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	color: var(--cm-text-muted);
+	font-size: 13px;
+	text-decoration: none;
+	padding: 6px 10px 6px 4px;
+	border-radius: var(--cm-radius-sm);
+	transition: background-color 0.15s ease, color 0.15s ease;
+}
+.cm-back-btn:hover { color: var(--cm-text); background: var(--cm-secondary-bg); text-decoration: none; }
+.cm-back-btn svg { width: 18px; height: 18px; }
+.cm-back-btn span { font-weight: 500; }
 
 .cm-empty {
 	text-align: center;

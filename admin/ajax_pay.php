@@ -65,6 +65,19 @@ case 'delPayType':
 	else exit('{"code":-1,"msg":"删除支付方式失败['.$DB->error().']"}');
 break;
 case 'savePayType':
+	$currency = isset($_POST['currency']) ? trim((string)$_POST['currency']) : '';
+	$network = isset($_POST['network']) ? trim((string)$_POST['network']) : '';
+	$currency_sort = isset($_POST['currency_sort']) ? max(0, intval($_POST['currency_sort'])) : 0;
+	$network_sort = isset($_POST['network_sort']) ? max(0, intval($_POST['network_sort'])) : 0;
+	if(strlen($currency) > 30 || strlen($network) > 30){
+		exit('{"code":-1,"msg":"币种/网络字段长度不能超过 30"}');
+	}
+	if($currency !== '' && !preg_match('/^[A-Za-z0-9_\-]+$/', $currency)){
+		exit('{"code":-1,"msg":"币种字段仅允许字母数字下划线和连字符"}');
+	}
+	if($network !== '' && !preg_match('/^[A-Za-z0-9_\-]+$/', $network)){
+		exit('{"code":-1,"msg":"网络字段仅允许字母数字下划线和连字符"}');
+	}
 	if($_POST['action'] == 'add'){
 		$name=trim($_POST['name']);
 		$showname=trim($_POST['showname']);
@@ -75,7 +88,11 @@ case 'savePayType':
 		$row=$DB->getRow("select * from pre_type where name='$name' and device='$device' limit 1");
 		if($row)
 			exit('{"code":-1,"msg":"同一个调用值+支持设备不能重复"}');
-		$data = ['name'=>$name, 'showname'=>$showname, 'device'=>$device, 'status'=>1];
+		$data = [
+			'name'=>$name, 'showname'=>$showname, 'device'=>$device, 'status'=>1,
+			'currency'=>$currency, 'network'=>$network,
+			'currency_sort'=>$currency_sort, 'network_sort'=>$network_sort,
+		];
 		if($DB->insert('type', $data))exit('{"code":0,"msg":"新增支付方式成功！"}');
 		else exit('{"code":-1,"msg":"新增支付方式失败['.$DB->error().']"}');
 	}else{
@@ -89,7 +106,11 @@ case 'savePayType':
 		$row=$DB->getRow("select * from pre_type where name='$name' and device='$device' and id<>$id limit 1");
 		if($row)
 			exit('{"code":-1,"msg":"同一个调用值+支持设备不能重复"}');
-		$data = ['name'=>$name, 'showname'=>$showname, 'device'=>$device];
+		$data = [
+			'name'=>$name, 'showname'=>$showname, 'device'=>$device,
+			'currency'=>$currency, 'network'=>$network,
+			'currency_sort'=>$currency_sort, 'network_sort'=>$network_sort,
+		];
 		if($DB->update('type', $data, ['id'=>$id])!==false)exit('{"code":0,"msg":"修改支付方式成功！"}');
 		else exit('{"code":-1,"msg":"修改支付方式失败['.$DB->error().']"}');
 	}

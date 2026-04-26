@@ -358,6 +358,90 @@ class Channel {
 		return $paytype;
 	}
 
+	/**
+	 * 收银台三级菜单数据：先一级 currency 分组，每组下二级 networks 列表。
+	 * 复用 getTypes() 的可用方式过滤逻辑（含用户组、随机/轮询通道存活检查）。
+	 *
+	 * @param int $uid
+	 * @param int $gid
+	 * @return array<int,array{
+	 *   key:string, currency:string, name:string, kind:string, icon:string,
+	 *   sort:int,
+	 *   networks: array<int,array{
+	 *     typeid:int, name:string, showname:string, network:?string,
+	 *     network_label:string, rate:?string, sort:int
+	 *   }>
+	 * }>
+	 */
+	static public function getCategorizedTypes($uid, $gid = 0)
+	{
+		require_once SYSTEM_ROOT.'pay_type_category.php';
+		$paytype = self::getTypes($uid, $gid);
+		if (!is_array($paytype) || count($paytype) === 0) {
+			return [];
+		}
+
+		$net_sort_map = pay_type_category_network_sort_map();
+		$buckets = [];
+		foreach ($paytype as $pt) {
+			$resolved = pay_type_category_resolve($pt);
+			$cur = $resolved['currency'];
+			$net = $resolved['network'];
+			$cm = $resolved['currency_meta'];
+
+			if (!isset($buckets[$cur])) {
+				$buckets[$cur] = [
+					'key'       => $cur,
+					'currency'  => $cur,
+					'name'      => $cm['name'],
+					'kind'      => $cm['kind'],
+					'icon'      => $cm['icon'],
+					'sort'      => (int) $cm['sort'],
+					'networks'  => [],
+				];
+			}
+
+			$net_label = $net !== null ? $net : '';
+			$net_sort_user = isset($pt['network_sort']) ? (int) $pt['network_sort'] : 0;
+			$net_sort_default = $net_label !== '' && isset($net_sort_map[strtoupper($net_label)])
+				? $net_sort_map[strtoupper($net_label)]
+				: 999;
+			$net_sort = $net_sort_user > 0 ? $net_sort_user : $net_sort_default;
+
+			$buckets[$cur]['networks'][] = [
+				'typeid'        => (int) $pt['id'],
+				'name'          => (string) $pt['name'],
+				'showname'      => (string) ($pt['showname'] ?: $pt['name']),
+				'network'       => $net,
+				'network_label' => $net_label,
+				'rate'          => isset($pt['rate']) ? (string) $pt['rate'] : null,
+				'sort'          => $net_sort,
+			];
+		}
+
+		foreach ($buckets as &$b) {
+			usort($b['networks'], function ($a, $c) {
+				if ($a['sort'] !== $c['sort']) {
+					return $a['sort'] - $c['sort'];
+				}
+
+				return strcasecmp($a['network_label'] ?: $a['showname'], $c['network_label'] ?: $c['showname']);
+			});
+		}
+		unset($b);
+
+		$out = array_values($buckets);
+		usort($out, function ($a, $b) {
+			if ($a['sort'] !== $b['sort']) {
+				return $a['sort'] - $b['sort'];
+			}
+
+			return strcasecmp($a['name'], $b['name']);
+		});
+
+		return $out;
+	}
+
 	//根据轮询组ID获取支付通道ID
 	static private function getChannelFromRoll($channel, $money){
 		global $DB;

@@ -130,16 +130,22 @@
 		});
 	}
 
-	/* ---------- Item click → submit ---------- */
+	/* ---------- Item click highlight ----------
+	 * 一级/二级条目都已渲染为 <a href>，默认跳转即可。
+	 * 这里仅做"立即点亮"反馈，避免点击后整页空白前的视觉空挡。
+	 * 兼容旧版（非 <a>）：保留 typeid+tradeno 的回退跳转逻辑。
+	 */
 	function initItemSelect() {
 		$$('.cm-item').forEach(function (it) {
 			if (it.classList.contains('is-disabled')) return;
-			it.addEventListener('click', function () {
+			it.addEventListener('click', function (e) {
+				$$('.cm-item').forEach(function (o) { o.classList.remove('is-active'); });
+				it.classList.add('is-active');
+				if (it.tagName.toLowerCase() === 'a' && it.getAttribute('href')) return;
 				var typeid = it.getAttribute('data-typeid');
 				var tradeNo = it.getAttribute('data-tradeno');
 				if (!typeid || !tradeNo) return;
-				$$('.cm-item').forEach(function (o) { o.classList.remove('is-active'); });
-				it.classList.add('is-active');
+				e.preventDefault();
 				window.location.href = './submit2.php?typeid=' + encodeURIComponent(typeid) +
 					'&trade_no=' + encodeURIComponent(tradeNo);
 			});

@@ -3,30 +3,21 @@ $is_defend = true;
 $nosession = true;
 require './includes/common.php';
 require_once SYSTEM_ROOT . 'pay_type_icon.php';
+require_once SYSTEM_ROOT . 'pay_type_category.php';
 
 @header('Content-Type: text/html; charset=UTF-8');
 
 $other = isset($_GET['other']) ? true : false;
 $trade_no = daddslashes($_GET['trade_no']);
 $sitename = base64_decode(daddslashes($_GET['sitename']));
+$cm_currency_param = isset($_GET['currency']) ? trim((string) $_GET['currency']) : '';
+$cm_currency_param = preg_replace('/[^A-Za-z0-9_\-]/', '', $cm_currency_param);
 
 $row = $DB->getRow("SELECT * FROM pre_order WHERE trade_no='{$trade_no}' limit 1");
 if (!$row) sysmsg('该订单号不存在，请返回来源地重新发起请求！');
 if ($row['status'] == 1) sysmsg('该订单已完成支付，请勿重复支付');
 
 $gid = $DB->getColumn("SELECT gid FROM pre_user WHERE uid='{$row['uid']}' limit 1");
-$paytype = \lib\Channel::getTypes($row['uid'], $gid);
-
-if (strpos($_SERVER['HTTP_USER_AGENT'], 'MicroMessenger') !== false) {
-	$paytype = array_values($paytype);
-	foreach ($paytype as $i => $s) {
-		if ($s['name'] == 'wxpay') {
-			$temp = $paytype[$i];
-			$paytype[$i] = $paytype[0];
-			$paytype[0] = $temp;
-		}
-	}
-}
 
 /* ---------- 订单生命周期 / 超时判定 ---------- */
 $cm_lifetime = isset($conf['order_lifetime']) && (int) $conf['order_lifetime'] > 0
@@ -46,110 +37,135 @@ if ($cm_is_expired) {
 	exit;
 }
 
-/* ---------- 支付方式分组（Most popular / Available） ----------
- * 启发式：USDT/USDC/TRX/BTC/ETH 等热门币种或带 trc20/erc20/bep20/polygon 的归 Most popular，
- *         其余归 Available。
+/* ---------- 三级菜单数据 ---------- */
+$cm_categories = \lib\Channel::getCategorizedTypes($row['uid'], $gid);
+
+/**
+ * 单网络快通道：直接生成 submit2.php 链接
+ * 否则：生成 cashier.php?currency=XXX 进入二级页面
  */
-$cm_paytype_list = array_values($paytype);
-$cm_popular = [];
-$cm_available = [];
-$cm_popular_keywords = ['usdt', 'usdc', 'btc', 'eth', 'trx', 'bnb', 'pol', 'trc20', 'erc20', 'bep20', 'polygon'];
-foreach ($cm_paytype_list as $pt) {
-	$nameLow = strtolower((string) $pt['name']);
-	$showLow = strtolower((string) $pt['showname']);
-	$isPop = false;
-	foreach ($cm_popular_keywords as $kw) {
-		if (strpos($nameLow, $kw) !== false || strpos($showLow, $kw) !== false) {
-			$isPop = true;
-			break;
-		}
-	}
-	if ($isPop) {
-		$cm_popular[] = $pt;
+$cm_self = (strpos($_SERVER['REQUEST_URI'] ?? '', '?') !== false ? strtok($_SERVER['REQUEST_URI'], '?') : ($_SERVER['REQUEST_URI'] ?? '/cashier.php'));
+$cm_qs_base = 'trade_no=' . urlencode($trade_no);
+if ($sitename) {
+	$cm_qs_base .= '&sitename=' . urlencode(base64_encode($sitename));
+}
+
+/**
+ * 渲染一级（币种）条目
+ */
+function cm_render_currency_item($cat, $trade_no, $self, $qs_base)
+{
+	$key = $cat['key'];
+	$name = $cat['name'];
+	$kind = $cat['kind'];
+	$icon = $cat['icon'];
+	$count = count($cat['networks']);
+
+	if ($count === 1) {
+		$only = $cat['networks'][0];
+		$href = './submit2.php?typeid=' . (int) $only['typeid'] . '&trade_no=' . urlencode((string) $trade_no);
+		$tag_h = htmlspecialchars($only['network_label'] !== '' ? $only['network_label'] : ($kind === 'fiat' ? 'Instant' : ''), ENT_QUOTES, 'UTF-8');
 	} else {
-		$cm_available[] = $pt;
+		$href = $self . '?' . $qs_base . '&currency=' . urlencode($key);
+		$tag_h = htmlspecialchars($count . ' networks', ENT_QUOTES, 'UTF-8');
 	}
+
+	$icon_html = pay_type_icon_html((string) $icon, 'cm-icon-img');
+	$name_h = htmlspecialchars((string) $name, ENT_QUOTES, 'UTF-8');
+	$short_h = htmlspecialchars(strtoupper(substr($key, 0, 6)), ENT_QUOTES, 'UTF-8');
+	$href_h = htmlspecialchars($href, ENT_QUOTES, 'UTF-8');
+	$search = strtolower($key . ' ' . $name . ' ' . $kind);
+	foreach ($cat['networks'] as $n) {
+		$search .= ' ' . strtolower($n['name'] . ' ' . $n['showname'] . ' ' . $n['network_label']);
+	}
+	$search_h = htmlspecialchars($search, ENT_QUOTES, 'UTF-8');
+
+	$html = '<a class="cm-item" href="' . $href_h . '" data-search="' . $search_h . '">';
+	$html .= '<span class="cm-item-icon">' . $icon_html . '</span>';
+	$html .= '<div class="cm-item-body">';
+	$html .= '<div class="cm-item-title"><span class="cm-item-code">' . $short_h . '</span><span class="cm-item-name">' . $name_h . '</span></div>';
+	$html .= '</div>';
+	if ($tag_h !== '') {
+		$html .= '<span class="cm-item-tag">' . $tag_h . '</span>';
+	}
+	$html .= '<svg class="cm-item-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>';
+	$html .= '</a>';
+
+	return $html;
 }
 
 /**
- * 根据支付方式名称推断"网络/链"标签
- * @param string $name
- * @return string
+ * 渲染二级（网络）条目
  */
-function cm_chain_tag($name)
+function cm_render_network_item($net, $trade_no)
 {
-	$n = strtolower((string) $name);
-	$map = [
-		'trc20' => 'Tron',
-		'tron' => 'Tron',
-		'.trx' => 'Tron',
-		'erc20' => 'Ethereum',
-		'.eth' => 'Ethereum',
-		'ethereum' => 'Ethereum',
-		'bep20' => 'BSC',
-		'bsc' => 'BSC',
-		'.bnb' => 'BSC',
-		'polygon' => 'Polygon',
-		'.pol' => 'Polygon',
-		'arbitrum' => 'Arbitrum',
-		'solana' => 'Solana',
-		'aptos' => 'Aptos',
-		'xlayer' => 'X Layer',
-		'base' => 'Base',
-		'plasma' => 'Plasma',
-		'alipay' => 'Alipay',
-		'wxpay' => 'WeChat',
-		'wechat' => 'WeChat',
-		'qqpay' => 'QQ',
-		'jdpay' => 'JD',
-		'bank' => 'Bank',
-		'paypal' => 'PayPal',
-	];
-	foreach ($map as $kw => $tag) {
-		if (strpos($n, $kw) !== false) return $tag;
-	}
-	return '';
-}
-
-/**
- * 渲染单个支付方式条目
- * @param array $pt
- * @param string $trade_no
- * @return string
- */
-function cm_render_item($pt, $trade_no)
-{
-	$icon = pay_type_icon_html($pt['name'], 'cm-icon-img');
-	$showname = $pt['showname'] ? $pt['showname'] : $pt['name'];
-	$short = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', (string) $pt['name']));
+	$icon_html = pay_type_icon_html($net['name'], 'cm-icon-img');
+	$showname = $net['showname'] ?: $net['name'];
+	$short = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', (string) $net['name']));
 	if (strlen($short) > 6) $short = substr($short, 0, 6);
-	$tag = cm_chain_tag($pt['name']);
-	$search = strtolower($pt['name'] . ' ' . $showname . ' ' . $tag);
+	$tag = $net['network_label'] !== '' ? $net['network_label'] : '';
+
 	$showname_h = htmlspecialchars((string) $showname, ENT_QUOTES, 'UTF-8');
 	$short_h = htmlspecialchars((string) $short, ENT_QUOTES, 'UTF-8');
 	$tag_h = htmlspecialchars((string) $tag, ENT_QUOTES, 'UTF-8');
-	$search_h = htmlspecialchars($search, ENT_QUOTES, 'UTF-8');
-	$tid = (int) $pt['id'];
 	$tradeno_h = htmlspecialchars((string) $trade_no, ENT_QUOTES, 'UTF-8');
+	$tid = (int) $net['typeid'];
+	$search = strtolower($net['name'] . ' ' . $showname . ' ' . $tag);
+	$search_h = htmlspecialchars($search, ENT_QUOTES, 'UTF-8');
+	$href = './submit2.php?typeid=' . $tid . '&trade_no=' . urlencode((string) $trade_no);
+	$href_h = htmlspecialchars($href, ENT_QUOTES, 'UTF-8');
 
-	$html = '<div class="cm-item" data-typeid="' . $tid . '" data-tradeno="' . $tradeno_h . '" data-search="' . $search_h . '">';
-	$html .= '<span class="cm-item-icon">' . $icon . '</span>';
+	$html = '<a class="cm-item" href="' . $href_h . '" data-search="' . $search_h . '">';
+	$html .= '<span class="cm-item-icon">' . $icon_html . '</span>';
 	$html .= '<div class="cm-item-body">';
 	$html .= '<div class="cm-item-title"><span class="cm-item-code">' . $short_h . '</span><span class="cm-item-name">' . $showname_h . '</span></div>';
 	$html .= '</div>';
 	if ($tag_h !== '') {
 		$html .= '<span class="cm-item-tag">' . $tag_h . '</span>';
 	}
-	$html .= '</div>';
+	$html .= '<svg class="cm-item-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>';
+	$html .= '</a>';
+
 	return $html;
 }
+
+/* ---------- 选定的二级页面（带 ?currency=...） ---------- */
+$cm_active_cat = null;
+if ($cm_currency_param !== '') {
+	foreach ($cm_categories as $c) {
+		if (strcasecmp($c['key'], $cm_currency_param) === 0) {
+			$cm_active_cat = $c;
+			break;
+		}
+	}
+	// 二级若只有 1 个网络，直接 302 进入支付通道
+	if ($cm_active_cat && count($cm_active_cat['networks']) === 1) {
+		$only = $cm_active_cat['networks'][0];
+		header('Location: ./submit2.php?typeid=' . (int) $only['typeid'] . '&trade_no=' . urlencode($trade_no), true, 302);
+		exit;
+	}
+}
+
+/* ---------- 一级分组：加密 / 法币 ---------- */
+$cm_crypto = [];
+$cm_fiat = [];
+$cm_other = [];
+if ($cm_active_cat === null) {
+	foreach ($cm_categories as $c) {
+		if ($c['kind'] === 'crypto') $cm_crypto[] = $c;
+		elseif ($c['kind'] === 'fiat') $cm_fiat[] = $c;
+		else $cm_other[] = $c;
+	}
+}
+
+$cm_back_url = $cm_self . '?' . $cm_qs_base;
 ?>
 <!DOCTYPE html>
 <html lang="zh-CN"><head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0">
-<title>收银台 | <?php echo htmlspecialchars((string) $cm_site_name, ENT_QUOTES, 'UTF-8'); ?></title>
-<link href="/assets/css/cashier-modern.css?v=1" rel="stylesheet" type="text/css">
+<title><?php echo $cm_active_cat ? 'Select Network' : 'Select Currency'; ?> | <?php echo htmlspecialchars((string) $cm_site_name, ENT_QUOTES, 'UTF-8'); ?></title>
+<link href="/assets/css/cashier-modern.css?v=2" rel="stylesheet" type="text/css">
 <link href="/assets/css/pay-type-icon.css" rel="stylesheet" type="text/css">
 </head>
 <body class="cm-page">
@@ -160,23 +176,47 @@ function cm_render_item($pt, $trade_no)
 <div class="cm-shell">
 	<h1 class="cm-title">支付方式维护中</h1>
 	<p class="cm-subtitle">当前支付方式暂时关闭维护，请更换其他方式支付。</p>
-	<?php if (in_array('qqpay', array_column($cm_paytype_list, 'name'))) { ?>
-	<div class="cm-card" style="text-align:center;">
-		<p style="color:var(--cm-text);">如果您需要微信支付，请将微信余额转到 QQ 后再选择 QQ 钱包支付。</p>
-		<p><a href="./wx.html">点击查看微信余额转到 QQ 钱包教程</a></p>
-	</div>
-	<?php } ?>
 </div>
 <?php } else { ?>
 
 <div class="cm-shell">
-	<h1 class="cm-title">Select Crypto</h1>
-	<p class="cm-subtitle">Choose your preferred cryptocurrency.</p>
+
+<?php if ($cm_active_cat !== null) { /* ---------- 二级：网络列表 ---------- */ ?>
+
+	<div class="cm-page-head">
+		<a class="cm-back-btn" href="<?php echo htmlspecialchars($cm_back_url, ENT_QUOTES, 'UTF-8'); ?>" aria-label="Back">
+			<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+			<span>Currencies</span>
+		</a>
+	</div>
+	<h1 class="cm-title">Select Network</h1>
+	<p class="cm-subtitle">
+		<?php echo htmlspecialchars((string) $cm_active_cat['name'], ENT_QUOTES, 'UTF-8'); ?>
+		· 选择您要使用的网络
+	</p>
+
+	<div class="cm-card">
+		<div class="cm-search">
+			<input type="text" id="cm-search-input" placeholder="Search network" autocomplete="off">
+		</div>
+
+		<div class="cm-list" id="cm-list">
+			<?php foreach ($cm_active_cat['networks'] as $n) {
+				echo cm_render_network_item($n, $trade_no);
+			} ?>
+			<div class="cm-empty" id="cm-empty">没有匹配的网络</div>
+		</div>
+	</div>
+
+<?php } else { /* ---------- 一级：币种列表 ---------- */ ?>
+
+	<h1 class="cm-title">Select Currency</h1>
+	<p class="cm-subtitle">Choose your preferred payment currency.</p>
 
 	<div class="cm-card">
 
 		<div class="cm-search">
-			<input type="text" id="cm-search-input" placeholder="Search" autocomplete="off">
+			<input type="text" id="cm-search-input" placeholder="Search currency" autocomplete="off">
 		</div>
 
 		<div class="cm-refresh">
@@ -186,25 +226,26 @@ function cm_render_item($pt, $trade_no)
 
 		<div class="cm-list" id="cm-list">
 
-			<?php if (count($cm_popular) > 0) { ?>
-				<div class="cm-group-title">Most popular</div>
-				<?php foreach ($cm_popular as $pt) {
-					echo cm_render_item($pt, $trade_no);
-				} ?>
+			<?php if (count($cm_crypto) > 0) { ?>
+				<div class="cm-group-title">Crypto</div>
+				<?php foreach ($cm_crypto as $c) { echo cm_render_currency_item($c, $trade_no, $cm_self, $cm_qs_base); } ?>
 			<?php } ?>
 
-			<?php if (count($cm_available) > 0) { ?>
-				<div class="cm-group-title">Available</div>
-				<?php foreach ($cm_available as $pt) {
-					echo cm_render_item($pt, $trade_no);
-				} ?>
+			<?php if (count($cm_fiat) > 0) { ?>
+				<div class="cm-group-title">Fiat</div>
+				<?php foreach ($cm_fiat as $c) { echo cm_render_currency_item($c, $trade_no, $cm_self, $cm_qs_base); } ?>
 			<?php } ?>
 
-			<?php if (count($cm_popular) + count($cm_available) === 0) { ?>
+			<?php if (count($cm_other) > 0) { ?>
+				<div class="cm-group-title">Others</div>
+				<?php foreach ($cm_other as $c) { echo cm_render_currency_item($c, $trade_no, $cm_self, $cm_qs_base); } ?>
+			<?php } ?>
+
+			<?php if (count($cm_categories) === 0) { ?>
 				<div class="cm-empty" style="display:block;">暂无可用支付方式</div>
+			<?php } else { ?>
+				<div class="cm-empty" id="cm-empty">没有匹配的币种</div>
 			<?php } ?>
-
-			<div class="cm-empty" id="cm-empty">没有匹配的支付方式</div>
 		</div>
 
 	</div>
@@ -227,6 +268,8 @@ function cm_render_item($pt, $trade_no)
 		</div>
 	</div>
 
+<?php } ?>
+
 </div>
 
 <?php } ?>
@@ -240,5 +283,5 @@ window.CM_CONFIG = {
 	expireAt: <?php echo (int) $cm_expire_ts; ?>
 };
 </script>
-<script src="/assets/js/cashier-modern.js?v=1"></script>
+<script src="/assets/js/cashier-modern.js?v=2"></script>
 </body></html>

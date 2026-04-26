@@ -59,3 +59,9 @@ ADD COLUMN `print_config` varchar(300) DEFAULT NULL;
 
 ALTER TABLE `pre_order`
 ADD COLUMN `cert_info` varchar(300) DEFAULT NULL;
+
+ALTER TABLE `pre_type`
+ADD COLUMN `currency` varchar(30) DEFAULT NULL,
+ADD COLUMN `network` varchar(30) DEFAULT NULL,
+ADD COLUMN `currency_sort` int(11) NOT NULL DEFAULT 0,
+ADD COLUMN `network_sort` int(11) NOT NULL DEFAULT 0;
