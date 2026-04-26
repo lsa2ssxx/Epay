@@ -323,14 +323,14 @@ window.CM_CONFIG = {
 	}
 
 	// 根据 getshop.php 返回的状态决定下一跳：
-	//   code=1 + paysuccess_url → 跳转站内「付款已完成」过渡页（由用户主动返回商家）
-	//   code=1（无 paysuccess_url）→ 兼容老逻辑直接回跳商户
-	//   code=2 → 跳转站内「付款已检测」过渡页
+	//   code=1/2 → 一律先进入「付款已检测」过渡页，由 paysuccess.php 保证至少展示一段时间后再切到「付款已完成」
+	//   code=1（无 paysuccess_url）→ 兼容非加密通道老逻辑直接回跳商户
 	function routeByResp(data, isUserCheck){
 		if (!data) return false;
 		if (data.code == 1) {
 			if (data.paysuccess_url) {
-				window.location.href = data.paysuccess_url;
+				// 服务端可能直接返回 completed URL，这里强制先走 detected 过渡页
+				window.location.href = '/paysuccess.php?trade_no=' + encodeURIComponent(tradeNo) + '&state=detected';
 			} else {
 				if (isUserCheck) layer.msg('支付成功，正在跳转中...', { icon: 16, shade: 0.1, time: 15000 });
 				setTimeout(function(){ window.location.href = data.backurl; }, isUserCheck ? 1000 : 600);

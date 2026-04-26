@@ -42,11 +42,12 @@ if (!empty($row['ext'])) {
 $has_detected = !empty($ext['detected_at']);
 $order_paid   = $row['status'] >= 1;
 
-if ($order_paid) {
-	$state = 'completed';
-} elseif ($state === 'completed' && !$order_paid) {
-	// 前端传 completed 但实际未确认：退回 detected（若有检测记录）
-	$state = $has_detected ? 'detected' : 'detected';
+// 状态判定规则：
+//   - URL 上的 state 是视觉层的显式请求（由 crypto.php 统一先进入 detected 做过渡）
+//   - 仅当 URL 请求 completed 但订单实际未确认时，回退到 detected 避免误导
+//   - 其余情况尊重 URL 请求，由前端 JS 决定何时自动切到 completed
+if ($state === 'completed' && !$order_paid) {
+	$state = 'detected';
 }
 
 /* ---------- 展示字段组装 ---------- */
@@ -299,8 +300,25 @@ window.CM_PAYSUCCESS = {
 	}
 
 	// detected 状态下继续轮询，一旦确认成功则自动切换到 completed
+	// 为了保证视觉过渡自然，detected 状态至少展示 MIN_DETECTED_MS 毫秒
+	var MIN_DETECTED_MS = 3500;
+	var loadedAt = Date.now();
+	var transitioned = false;
+
+	function goCompleted(){
+		if (transitioned) return;
+		transitioned = true;
+		window.location.href = '/paysuccess.php?trade_no=' + encodeURIComponent(tradeNo) + '&state=completed';
+	}
+
+	function scheduleGoCompleted(){
+		var elapsed = Date.now() - loadedAt;
+		var wait = Math.max(0, MIN_DETECTED_MS - elapsed);
+		setTimeout(goCompleted, wait);
+	}
+
 	function pollForComplete(){
-		if (currentState !== 'detected') return;
+		if (currentState !== 'detected' || transitioned) return;
 		var xhr = new XMLHttpRequest();
 		xhr.open('GET', '/getshop.php?type=crypto&trade_no=' + encodeURIComponent(tradeNo), true);
 		xhr.onreadystatechange = function(){
@@ -308,17 +326,17 @@ window.CM_PAYSUCCESS = {
 			try {
 				var d = JSON.parse(xhr.responseText);
 				if (d && d.code == 1) {
-					// 付款已确认，刷新为 completed 视图
-					window.location.href = '/paysuccess.php?trade_no=' + encodeURIComponent(tradeNo) + '&state=completed';
+					scheduleGoCompleted();
 					return;
 				}
 			} catch(e) {}
-			setTimeout(pollForComplete, 3000);
+			setTimeout(pollForComplete, 2500);
 		};
 		xhr.send();
 	}
 	if (currentState === 'detected') {
-		setTimeout(pollForComplete, 3000);
+		// 首次立即查询一次，避免进入时订单已确认却还要等 3s 才触发轮询
+		setTimeout(pollForComplete, 800);
 	}
 })();
 </script>
