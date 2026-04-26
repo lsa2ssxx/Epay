@@ -51,6 +51,47 @@ if ($sitename) {
 }
 
 /**
+ * 通用 chevron SVG（带显式 width/height，避免 CSS 缺失时撑爆布局）
+ */
+function cm_chev_svg()
+{
+	return '<svg class="cm-item-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"></polyline></svg>';
+}
+
+/**
+ * 一级币种图标：
+ *   - 法币 / 原生币 / 通用方式 → 直接用 .ico（assets/icon/<file>.ico）
+ *   - 稳定币（USDT/USDC/BTC 等没有独立 .ico）→ 用文字 badge + 品牌色
+ */
+function cm_currency_icon_html($cat)
+{
+	$kind = $cat['kind'];
+	$icon = (string) $cat['icon'];
+	$key = strtoupper((string) $cat['key']);
+
+	$has_native_ico = [
+		'tron.trx', 'ethereum.eth', 'bsc.bnb', 'polygon.pol',
+		'solana.sol', 'aptos.apt',
+		'alipay', 'wxpay', 'wechat', 'qqpay', 'jdpay', 'bank', 'paypal',
+	];
+	if (in_array($icon, $has_native_ico, true)) {
+		return pay_type_icon_html($icon, 'cm-icon-img');
+	}
+
+	$brand_bg = [
+		'USDT' => '#26A17B',
+		'USDC' => '#2775CA',
+		'DAI'  => '#F4B731',
+		'BTC'  => '#F7931A',
+		'ETH'  => '#627EEA',
+	];
+	$bg = $brand_bg[$key] ?? '#5B6CFF';
+	$label = htmlspecialchars(substr($key, 0, 4), ENT_QUOTES, 'UTF-8');
+
+	return '<span class="cm-token-badge" style="background:' . $bg . ';">' . $label . '</span>';
+}
+
+/**
  * 渲染一级（币种）条目
  */
 function cm_render_currency_item($cat, $trade_no, $self, $qs_base)
@@ -58,7 +99,6 @@ function cm_render_currency_item($cat, $trade_no, $self, $qs_base)
 	$key = $cat['key'];
 	$name = $cat['name'];
 	$kind = $cat['kind'];
-	$icon = $cat['icon'];
 	$count = count($cat['networks']);
 
 	if ($count === 1) {
@@ -70,7 +110,7 @@ function cm_render_currency_item($cat, $trade_no, $self, $qs_base)
 		$tag_h = htmlspecialchars($count . ' networks', ENT_QUOTES, 'UTF-8');
 	}
 
-	$icon_html = pay_type_icon_html((string) $icon, 'cm-icon-img');
+	$icon_html = cm_currency_icon_html($cat);
 	$name_h = htmlspecialchars((string) $name, ENT_QUOTES, 'UTF-8');
 	$short_h = htmlspecialchars(strtoupper(substr($key, 0, 6)), ENT_QUOTES, 'UTF-8');
 	$href_h = htmlspecialchars($href, ENT_QUOTES, 'UTF-8');
@@ -88,7 +128,7 @@ function cm_render_currency_item($cat, $trade_no, $self, $qs_base)
 	if ($tag_h !== '') {
 		$html .= '<span class="cm-item-tag">' . $tag_h . '</span>';
 	}
-	$html .= '<svg class="cm-item-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>';
+	$html .= cm_chev_svg();
 	$html .= '</a>';
 
 	return $html;
@@ -108,7 +148,6 @@ function cm_render_network_item($net, $trade_no)
 	$showname_h = htmlspecialchars((string) $showname, ENT_QUOTES, 'UTF-8');
 	$short_h = htmlspecialchars((string) $short, ENT_QUOTES, 'UTF-8');
 	$tag_h = htmlspecialchars((string) $tag, ENT_QUOTES, 'UTF-8');
-	$tradeno_h = htmlspecialchars((string) $trade_no, ENT_QUOTES, 'UTF-8');
 	$tid = (int) $net['typeid'];
 	$search = strtolower($net['name'] . ' ' . $showname . ' ' . $tag);
 	$search_h = htmlspecialchars($search, ENT_QUOTES, 'UTF-8');
@@ -123,7 +162,7 @@ function cm_render_network_item($net, $trade_no)
 	if ($tag_h !== '') {
 		$html .= '<span class="cm-item-tag">' . $tag_h . '</span>';
 	}
-	$html .= '<svg class="cm-item-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>';
+	$html .= cm_chev_svg();
 	$html .= '</a>';
 
 	return $html;
@@ -165,7 +204,7 @@ $cm_back_url = $cm_self . '?' . $cm_qs_base;
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0">
 <title><?php echo $cm_active_cat ? 'Select Network' : 'Select Currency'; ?> | <?php echo htmlspecialchars((string) $cm_site_name, ENT_QUOTES, 'UTF-8'); ?></title>
-<link href="/assets/css/cashier-modern.css?v=2" rel="stylesheet" type="text/css">
+<link href="/assets/css/cashier-modern.css?v=3" rel="stylesheet" type="text/css">
 <link href="/assets/css/pay-type-icon.css" rel="stylesheet" type="text/css">
 </head>
 <body class="cm-page">
@@ -185,7 +224,7 @@ $cm_back_url = $cm_self . '?' . $cm_qs_base;
 
 	<div class="cm-page-head">
 		<a class="cm-back-btn" href="<?php echo htmlspecialchars($cm_back_url, ENT_QUOTES, 'UTF-8'); ?>" aria-label="Back">
-			<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+			<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"></polyline></svg>
 			<span>Currencies</span>
 		</a>
 	</div>
@@ -220,7 +259,7 @@ $cm_back_url = $cm_self . '?' . $cm_qs_base;
 		</div>
 
 		<div class="cm-refresh">
-			<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+			<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
 			<span>Next update in <span id="cm-refresh-sec">12</span>s</span>
 		</div>
 
@@ -283,5 +322,5 @@ window.CM_CONFIG = {
 	expireAt: <?php echo (int) $cm_expire_ts; ?>
 };
 </script>
-<script src="/assets/js/cashier-modern.js?v=2"></script>
+<script src="/assets/js/cashier-modern.js?v=3"></script>
 </body></html>

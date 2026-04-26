@@ -73,6 +73,10 @@
 	box-sizing: border-box;
 }
 
+/* SVG 安全网：避免任何 inline SVG 在 flex/auto 环境下被撑大。
+   不依赖具体类，确保收银台所有内联图标都先回到合理尺寸。 */
+.cm-page svg { width: 1em; height: 1em; flex-shrink: 0; }
+
 .cm-page {
 	min-height: 100vh;
 	background: var(--cm-bg);
@@ -215,6 +219,20 @@
 .cm-item-icon .pay-type-chain-badge--solo {
 	font-size: 9px; padding: 2px 5px;
 }
+/* 稳定币（USDT/USDC/...）没有独立 .ico，使用文字 token badge */
+.cm-token-badge {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 28px;
+	height: 28px;
+	border-radius: 50%;
+	color: #ffffff;
+	font-size: 9px;
+	font-weight: 700;
+	letter-spacing: -0.2px;
+	line-height: 1;
+}
 .cm-item-body { flex: 1; min-width: 0; }
 .cm-item-title {
 	display: flex;
@@ -224,10 +242,20 @@
 	font-size: 14px;
 	font-weight: 600;
 }
+.cm-item-title .cm-item-code {
+	color: var(--cm-text);
+	font-weight: 600;
+	font-size: 14px;
+	letter-spacing: 0.2px;
+}
 .cm-item-title .cm-item-name {
 	color: var(--cm-text-muted);
 	font-weight: 400;
 	font-size: 13px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	min-width: 0;
 }
 .cm-item-rate {
 	font-size: 12px;
