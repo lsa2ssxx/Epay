@@ -259,14 +259,60 @@ class bepusdt_plugin
 
         $out_trade_no = $data['order_id'];    // 商户订单号
         $trade_no     = $data['trade_id'];    // BEpusdt 交易ID
-        $buyer        = mb_substr($data['buyer'], -28);
-        if ($data['status'] === 2 && $out_trade_no == TRADE_NO) {
+        $buyer        = mb_substr($data['buyer'] ?? '', -28);
+        $status       = isset($data['status']) ? (int) $data['status'] : 0;
+
+        if ($out_trade_no != TRADE_NO) {
+            exit('fail - order mismatch');
+        }
+
+        // status=1 链上已检测但未确认：仅登记检测状态，不修改订单支付状态
+        if ($status === 1) {
+            self::_markDetected($order, $trade_no, $buyer);
+            exit('ok');
+        }
+
+        if ($status === 2) {
+            // 确认前补登检测状态，保证前端能先走 detected → completed 的流式过渡
+            self::_markDetected($order, $trade_no, $buyer);
             processNotify($order, $trade_no, $buyer);
 
             exit('ok');
         }
 
         exit('fail - status error');
+    }
+
+    /**
+     * 将链上检测信息回写到 pre_order.ext，供收银台前端读取展示。
+     * 不会覆盖同一订单的历史 detection 记录（例如重复回调）。
+     *
+     * @param array  $order    当前订单行
+     * @param string $trade_no BEpusdt 交易 ID（作为 detection tx）
+     * @param string $buyer    付款方钱包地址
+     */
+    private static function _markDetected(array $order, string $trade_no, string $buyer): void
+    {
+        global $DB;
+
+        $ext = [];
+        if (!empty($order['ext'])) {
+            $decoded = @unserialize($order['ext']);
+            if (is_array($decoded)) {
+                $ext = $decoded;
+            }
+        }
+
+        // 若已记录 detected_at 则跳过，避免回调重试覆盖首个检测时间
+        if (!empty($ext['detected_at'])) {
+            return;
+        }
+
+        $ext['detected_at']    = date('Y-m-d H:i:s');
+        $ext['detected_tx']    = $trade_no;
+        $ext['detected_buyer'] = $buyer;
+
+        $DB->update('order', ['ext' => serialize($ext)], ['trade_no' => $order['trade_no']]);
     }
 
     public static function return(): array

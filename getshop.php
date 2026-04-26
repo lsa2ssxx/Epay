@@ -21,8 +21,10 @@ case 'captcha_verify':
 break;
 default:
 	$trade_no=isset($_GET['trade_no'])?daddslashes($_GET['trade_no']):exit('{"code":-2,"msg":"No trade_no!"}');
+	$type = isset($_GET['type']) ? daddslashes($_GET['type']) : '';
 
 	$row=$DB->getRow("SELECT * FROM pre_order WHERE trade_no='{$trade_no}' limit 1");
+	$paysuccess_url = '/paysuccess.php?trade_no=' . urlencode($trade_no);
 	if($row['status']>=1){
 		// 支付完成5分钟后禁止跳转回网站
 		if(!empty($row['endtime']) && time() - strtotime($row['endtime']) > 300){
@@ -34,9 +36,30 @@ default:
 		if($row['status'] == 2){
 			$jumpurl = '/payerr.html';
 		}
-		echo json_encode(['code'=>1, 'msg'=>'付款成功', 'backurl'=>$jumpurl]);
+		$resp = ['code'=>1, 'msg'=>'付款成功', 'backurl'=>$jumpurl];
+		// 加密货币收银台：默认跳转到站内「付款已完成」过渡页，由用户主动返回商家
+		if($type === 'crypto' && $row['status'] == 1){
+			$resp['paysuccess_url'] = $paysuccess_url . '&state=completed';
+		}
+		echo json_encode($resp);
 	}else{
-		echo json_encode(['code'=>-1, 'msg'=>'未付款']);
+		// 中间态：链上已检测、尚未确认
+		$detected = false;
+		if($type === 'crypto' && !empty($row['ext'])){
+			$ext = @unserialize($row['ext']);
+			if(is_array($ext) && !empty($ext['detected_at'])){
+				$detected = true;
+			}
+		}
+		if($detected){
+			echo json_encode([
+				'code'           => 2,
+				'msg'            => '付款已检测',
+				'paysuccess_url' => $paysuccess_url . '&state=detected',
+			]);
+		}else{
+			echo json_encode(['code'=>-1, 'msg'=>'未付款']);
+		}
 	}
 break;
 }

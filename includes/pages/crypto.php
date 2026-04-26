@@ -322,7 +322,28 @@ window.CM_CONFIG = {
 		} catch(e) { cb(false); }
 	}
 
-	// 回调轮询，与 bank_qrcode / alipay_qrcode 行为一致
+	// 根据 getshop.php 返回的状态决定下一跳：
+	//   code=1 + paysuccess_url → 跳转站内「付款已完成」过渡页（由用户主动返回商家）
+	//   code=1（无 paysuccess_url）→ 兼容老逻辑直接回跳商户
+	//   code=2 → 跳转站内「付款已检测」过渡页
+	function routeByResp(data, isUserCheck){
+		if (!data) return false;
+		if (data.code == 1) {
+			if (data.paysuccess_url) {
+				window.location.href = data.paysuccess_url;
+			} else {
+				if (isUserCheck) layer.msg('支付成功，正在跳转中...', { icon: 16, shade: 0.1, time: 15000 });
+				setTimeout(function(){ window.location.href = data.backurl; }, isUserCheck ? 1000 : 600);
+			}
+			return true;
+		}
+		if (data.code == 2 && data.paysuccess_url) {
+			window.location.href = data.paysuccess_url;
+			return true;
+		}
+		return false;
+	}
+
 	function loadmsg() {
 		$.ajax({
 			type: 'GET',
@@ -330,10 +351,7 @@ window.CM_CONFIG = {
 			url: '/getshop.php',
 			data: { type: 'crypto', trade_no: tradeNo },
 			success: function (data) {
-				if (data.code == 1) {
-					layer.msg('支付成功，正在跳转中...', { icon: 16, shade: 0.1, time: 15000 });
-					setTimeout(function(){ window.location.href = data.backurl; }, 1000);
-				} else {
+				if (!routeByResp(data, false)) {
 					setTimeout(loadmsg, 3000);
 				}
 			},
@@ -347,10 +365,7 @@ window.CM_CONFIG = {
 			url: '/getshop.php',
 			data: { type: 'crypto', trade_no: tradeNo },
 			success: function (data) {
-				if (data.code == 1) {
-					layer.msg('支付成功，正在跳转中...', { icon: 16, shade: 0.1, time: 15000 });
-					setTimeout(function(){ window.location.href = data.backurl; }, 1000);
-				} else {
+				if (!routeByResp(data, true)) {
 					layer.msg('您还未完成付款，请继续付款', { shade: 0, time: 1500 });
 				}
 			},
