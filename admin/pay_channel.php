@@ -53,6 +53,12 @@ unset($rs);
 						</div>
 					</div>
 					<div class="form-group">
+						<label class="col-sm-2 control-label no-padding-right">前台显示名称</label>
+						<div class="col-sm-10">
+							<input type="text" class="form-control" name="front_showname" id="front_showname" placeholder="收银台列表主文案；留空则沿用支付方式名称" maxlength="64">
+						</div>
+					</div>
+					<div class="form-group">
 						<label class="col-sm-2 control-label no-padding-right">分成比例</label>
 						<div class="col-sm-10">
 							<div class="input-group"><input type="text" class="form-control" name="rate" id="rate" placeholder="在没配置用户组的情况下以此费率为准" title="是指给商户的分成比例"><span class="input-group-addon">%</span></div>
@@ -223,9 +229,9 @@ function getChannelTableColumns() {
 			title: '收银台',
 			formatter: function(value, row, index) {
 				if(value == '0' || value === 0){
-					return '<span class="label label-warning">不可用</span>';
+					return '<a class="btn btn-xs btn-warning" onclick="setCashierOk('+row.id+',1)" title="点击改为收银台可用">不可用</a>';
 				}
-				return '<span class="label label-success">可用</span>';
+				return '<a class="btn btn-xs btn-success" onclick="setCashierOk('+row.id+',0)" title="点击改为收银台不可用">可用</a>';
 			}
 		},
 		{
@@ -427,6 +433,7 @@ function addframe(){
 	$("#timestart").val('');
 	$("#timestop").val('');
 	$("#cashier_ok").val('1');
+	$("#front_showname").val('');
 }
 function editframe(id){
 	var ii = layer.load(2, {shade:[0.1,'#fff']});
@@ -442,6 +449,7 @@ function editframe(id){
 				$("#action").val("edit");
 				$("#id").val(data.data.id);
 				$("#name").val(data.data.name);
+				$("#front_showname").val(data.data.front_showname != null ? data.data.front_showname : '');
 				$("#rate").val(data.data.rate);
 				$("#costrate").val(data.data.costrate);
 				$("#type").val(data.data.type);
@@ -479,6 +487,7 @@ function copyframe(id){
 				$("#action").val("copy");
 				$("#id").val(data.data.id);
 				$("#name").val(data.data.name);
+				$("#front_showname").val(data.data.front_showname != null ? data.data.front_showname : '');
 				$("#rate").val(data.data.rate);
 				$("#costrate").val(data.data.costrate);
 				$("#type").val(data.data.type);
@@ -568,6 +577,24 @@ function setStatus(id,status) {
 	$.ajax({
 		type : 'GET',
 		url : 'ajax_pay.php?act=setChannel&id='+id+'&status='+status,
+		dataType : 'json',
+		success : function(data) {
+			if(data.code == 0){
+				searchSubmit();
+			}else{
+				layer.msg(data.msg, {icon:2, time:1500});
+			}
+		},
+		error:function(data){
+			layer.msg('服务器错误');
+			return false;
+		}
+	});
+}
+function setCashierOk(id, ok) {
+	$.ajax({
+		type : 'GET',
+		url : 'ajax_pay.php?act=setChannelCashierOk&id='+id+'&ok='+ok,
 		dataType : 'json',
 		success : function(data) {
 			if(data.code == 0){

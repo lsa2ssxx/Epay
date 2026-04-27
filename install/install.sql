@@ -5,7 +5,7 @@ create table `pre_config` (
 PRIMARY KEY  (`k`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
-INSERT INTO `pre_config` VALUES ('version', '2056');
+INSERT INTO `pre_config` VALUES ('version', '2057');
 INSERT INTO `pre_config` VALUES ('admin_user', 'admin');
 INSERT INTO `pre_config` VALUES ('admin_pwd', '123456');
 INSERT INTO `pre_config` VALUES ('admin_paypwd', '123456');
@@ -124,6 +124,7 @@ CREATE TABLE `pre_channel` (
   `type` int(11) unsigned NOT NULL,
   `plugin` varchar(30) NOT NULL,
   `name` varchar(30) NOT NULL,
+  `front_showname` varchar(64) DEFAULT NULL,
   `rate` decimal(5,2) NOT NULL DEFAULT '100.00',
   `status` tinyint(1) NOT NULL DEFAULT '0',
   `apptype` varchar(50) DEFAULT NULL,

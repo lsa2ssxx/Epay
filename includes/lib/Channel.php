@@ -369,6 +369,50 @@ class Channel {
 		return $paytype;
 	}
 
+	/** 同支付方式下首个配置了「前台展示名」的启用通道（按 id），供收银台主文案使用 */
+	static private function firstFrontShownameForType($typeid)
+	{
+		global $DB;
+		$tid = (int) $typeid;
+		if ($tid < 1) {
+			return '';
+		}
+		$s = $DB->getColumn("SELECT `front_showname` FROM pre_channel WHERE `type`='{$tid}' AND `status`=1 AND `front_showname` IS NOT NULL AND TRIM(`front_showname`)!='' ORDER BY `id` ASC LIMIT 1");
+		if ($s === false || $s === null) {
+			return '';
+		}
+		return trim((string) $s);
+	}
+
+	/** 轮询组内成员通道首个非空前台展示名 */
+	static private function firstFrontShownameForRollId($rollId)
+	{
+		global $DB;
+		$rollId = (int) $rollId;
+		if ($rollId < 1) {
+			return '';
+		}
+		$row = $DB->getRow("SELECT `info` FROM pre_roll WHERE `id`='{$rollId}' LIMIT 1");
+		if (!$row || empty($row['info'])) {
+			return '';
+		}
+		$info = self::rollinfo_decode($row['info']);
+		if (empty($info)) {
+			return '';
+		}
+		foreach ($info as $inforow) {
+			$cid = (int) $inforow['name'];
+			if ($cid < 1) {
+				continue;
+			}
+			$s = $DB->getColumn("SELECT `front_showname` FROM pre_channel WHERE `id`='{$cid}' LIMIT 1");
+			if ($s !== false && $s !== null && trim((string) $s) !== '') {
+				return trim((string) $s);
+			}
+		}
+		return '';
+	}
+
 	/**
 	 * 收银台三级菜单数据：先一级 currency 分组，每组下二级 networks 列表。
 	 * 复用 getTypes() 的可用方式过滤逻辑（含用户组、随机/轮询通道存活检查）。
@@ -432,10 +476,16 @@ class Channel {
 				: 999;
 			$net_sort = $net_sort_user > 0 ? $net_sort_user : $net_sort_default;
 
+			$lineShowname = (string) ($pt['showname'] ?: $pt['name']);
+			$fs = self::firstFrontShownameForType($tid);
+			if ($fs !== '') {
+				$lineShowname = $fs;
+			}
+
 			$buckets[$cur]['networks'][] = [
 				'typeid'         => $tid,
 				'name'           => (string) $pt['name'],
-				'showname'       => (string) ($pt['showname'] ?: $pt['name']),
+				'showname'       => $lineShowname,
 				'network'        => $net,
 				'network_label'  => $net_label,
 				'rate'           => isset($pt['rate']) ? (string) $pt['rate'] : null,
@@ -472,6 +522,10 @@ class Channel {
 					$showname = $first['network_label'] !== ''
 						? ($cur.' · '.$first['network_label'])
 						: ($first['showname'] ?: $cur);
+					$rollFs = self::firstFrontShownameForRollId((int) $roll['id']);
+					if ($rollFs !== '') {
+						$showname = $rollFs;
+					}
 
 					$rate_min = null;
 					foreach ($idx_list as $i) {
