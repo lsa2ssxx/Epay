@@ -65,3 +65,9 @@ ADD COLUMN `currency` varchar(30) DEFAULT NULL,
 ADD COLUMN `network` varchar(30) DEFAULT NULL,
 ADD COLUMN `currency_sort` int(11) NOT NULL DEFAULT 0,
 ADD COLUMN `network_sort` int(11) NOT NULL DEFAULT 0;
+
+ALTER TABLE `pre_roll`
+ADD COLUMN `category` tinyint(1) NOT NULL DEFAULT 0,
+ADD COLUMN `currency` varchar(30) DEFAULT NULL,
+ADD COLUMN `network` varchar(30) DEFAULT NULL,
+ADD INDEX `idx_crypto` (`category`,`currency`,`network`,`status`);

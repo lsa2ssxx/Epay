@@ -22,6 +22,7 @@ foreach($rs as $row){
 }
 unset($rs);
 $rolltype = ['顺序轮询','随机轮询','首个启用'];
+$rollcategory = ['按支付方式','按加密货币'];
 
 $list = $DB->getAll("SELECT * FROM pre_roll ORDER BY id ASC");
 ?>
@@ -45,11 +46,32 @@ $list = $DB->getAll("SELECT * FROM pre_roll ORDER BY id ASC");
 						</div>
 					</div>
 					<div class="form-group">
+						<label class="col-sm-2 control-label">轮询模式</label>
+						<div class="col-sm-10">
+							<select name="category" id="category" class="form-control" onchange="onCategoryChange()">
+								<option value="0">按支付方式（同一支付方式下多个通道）</option>
+								<option value="1">按加密货币（同币种 + 同网络，跨支付方式）</option>
+							</select>
+						</div>
+					</div>
+					<div class="form-group" id="grp_type">
 						<label class="col-sm-2 control-label">支付方式</label>
 						<div class="col-sm-10">
 							<select name="type" id="type" class="form-control">
 								<option value="0">请选择支付方式</option><?php echo $type_select; ?>
 							</select>
+						</div>
+					</div>
+					<div class="form-group hide" id="grp_currency">
+						<label class="col-sm-2 control-label">币种</label>
+						<div class="col-sm-10">
+							<input type="text" class="form-control" name="currency" id="currency" placeholder="如 USDT / USDC / BTC，与支付方式中币种字段保持一致" maxlength="30">
+						</div>
+					</div>
+					<div class="form-group hide" id="grp_network">
+						<label class="col-sm-2 control-label">网络</label>
+						<div class="col-sm-10">
+							<input type="text" class="form-control" name="network" id="network" placeholder="如 TRC20 / ERC20 / Polygon，与支付方式中网络字段保持一致" maxlength="30">
 						</div>
 					</div>
 					<div class="form-group">
@@ -100,12 +122,22 @@ $list = $DB->getAll("SELECT * FROM pre_roll ORDER BY id ASC");
    <div class="panel-heading"><h3 class="panel-title">系统共有 <b><?php echo count($list);?></b> 个轮询组&nbsp;<span class="pull-right"><a href="javascript:addframe()" class="btn btn-default btn-xs"><i class="fa fa-plus"></i> 新增</a></span></h3></div>
       <div class="table-responsive">
         <table class="table table-striped">
-          <thead><tr><th>ID</th><th>显示名称</th><th>支付方式</th><th>轮询方式</th><th>轮询规则</th><th>状态</th><th>操作</th></tr></thead>
+          <thead><tr><th>ID</th><th>显示名称</th><th>轮询模式</th><th>支付方式 / 币种·网络</th><th>轮询方式</th><th>轮询规则</th><th>状态</th><th>操作</th></tr></thead>
           <tbody>
 <?php
 foreach($list as $res)
 {
-echo '<tr><td><b>'.$res['id'].'</b></td><td>'.$res['name'].'</td><td>'.$paytype[$res['type']].'</td><td>'.$rolltype[$res['kind']].'</td><td>'.$res['info'].'</td><td>'.($res['status']==1?'<a class="btn btn-xs btn-success" onclick="setStatus('.$res['id'].',0)">已开启</a>':'<a class="btn btn-xs btn-warning" onclick="setStatus('.$res['id'].',1)">已关闭</a>').'</td><td><a class="btn btn-xs btn-primary" onclick="editInfo('.$res['id'].')">配置通道</a>&nbsp;<a class="btn btn-xs btn-info" onclick="editframe('.$res['id'].')">编辑</a>&nbsp;<a class="btn btn-xs btn-danger" onclick="delItem('.$res['id'].')">删除</a></td></tr>';
+	$cat = isset($res['category']) ? (int)$res['category'] : 0;
+	if($cat === 1){
+		$cur = htmlspecialchars((string)($res['currency'] ?? ''), ENT_QUOTES, 'UTF-8');
+		$net = htmlspecialchars((string)($res['network']  ?? ''), ENT_QUOTES, 'UTF-8');
+		$target = '<span class="label label-info">'.$cur.'</span> <span class="label label-primary">'.$net.'</span>';
+		$catLabel = '<span class="label label-warning">按加密货币</span>';
+	}else{
+		$target = htmlspecialchars((string)($paytype[$res['type']] ?? '-'), ENT_QUOTES, 'UTF-8');
+		$catLabel = '<span class="label label-default">按支付方式</span>';
+	}
+	echo '<tr><td><b>'.$res['id'].'</b></td><td>'.htmlspecialchars((string)$res['name'], ENT_QUOTES, 'UTF-8').'</td><td>'.$catLabel.'</td><td>'.$target.'</td><td>'.$rolltype[$res['kind']].'</td><td>'.htmlspecialchars((string)$res['info'], ENT_QUOTES, 'UTF-8').'</td><td>'.($res['status']==1?'<a class="btn btn-xs btn-success" onclick="setStatus('.$res['id'].',0)">已开启</a>':'<a class="btn btn-xs btn-warning" onclick="setStatus('.$res['id'].',1)">已关闭</a>').'</td><td><a class="btn btn-xs btn-primary" onclick="editInfo('.$res['id'].')">配置通道</a>&nbsp;<a class="btn btn-xs btn-info" onclick="editframe('.$res['id'].')">编辑</a>&nbsp;<a class="btn btn-xs btn-danger" onclick="delItem('.$res['id'].')">删除</a></td></tr>';
 }
 ?>
           </tbody>
@@ -116,6 +148,18 @@ echo '<tr><td><b>'.$res['id'].'</b></td><td>'.$res['name'].'</td><td>'.$paytype[
   </div>
 <script src="<?php echo $cdnpublic?>layer/3.1.1/layer.js"></script>
 <script>
+function onCategoryChange(){
+	var c = $("#category").val();
+	if(c == '1'){
+		$("#grp_type").addClass('hide');
+		$("#grp_currency").removeClass('hide');
+		$("#grp_network").removeClass('hide');
+	}else{
+		$("#grp_type").removeClass('hide');
+		$("#grp_currency").addClass('hide');
+		$("#grp_network").addClass('hide');
+	}
+}
 function addframe(){
 	$("#modal-store").modal('show');
 	$("#modal-title").html("新增轮询组");
@@ -124,6 +168,10 @@ function addframe(){
 	$("#name").val('');
 	$("#type").val(0);
 	$("#kind").val(0);
+	$("#category").val(0);
+	$("#currency").val('');
+	$("#network").val('');
+	onCategoryChange();
 }
 function editframe(id){
 	var ii = layer.load(2, {shade:[0.1,'#fff']});
@@ -141,6 +189,10 @@ function editframe(id){
 				$("#name").val(data.data.name);
 				$("#type").val(data.data.type);
 				$("#kind").val(data.data.kind);
+				$("#category").val(data.data.category || 0);
+				$("#currency").val(data.data.currency || '');
+				$("#network").val(data.data.network || '');
+				onCategoryChange();
 			}else{
 				layer.alert(data.msg, {icon: 2})
 			}
@@ -155,8 +207,14 @@ function save(){
 	if($("#name").val()==''){
 		layer.alert('请确保各项不能为空！');return false;
 	}
-	if($("#type").val()==0){
-		layer.alert('请选择支付方式！');return false;
+	if($("#category").val() == '1'){
+		if($("#currency").val()==''||$("#network").val()==''){
+			layer.alert('请填写币种与网络！');return false;
+		}
+	}else{
+		if($("#type").val()==0){
+			layer.alert('请选择支付方式！');return false;
+		}
 	}
 	var ii = layer.load(2, {shade:[0.1,'#fff']});
 	$.ajax({

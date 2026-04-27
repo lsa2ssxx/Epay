@@ -631,26 +631,81 @@ case 'delRoll':
 	else exit('{"code":-1,"msg":"删除轮询组失败['.$DB->error().']"}');
 break;
 case 'saveRoll':
+	$category = isset($_POST['category']) ? intval($_POST['category']) : 0;
+	if($category !== 0 && $category !== 1){
+		exit('{"code":-1,"msg":"轮询模式不合法"}');
+	}
+	$currency = isset($_POST['currency']) ? trim((string)$_POST['currency']) : '';
+	$network  = isset($_POST['network'])  ? trim((string)$_POST['network'])  : '';
+	if($category === 1){
+		if($currency === '' || $network === ''){
+			exit('{"code":-1,"msg":"按加密货币模式必须填写币种与网络"}');
+		}
+		if(!preg_match('/^[A-Za-z0-9_\-]+$/', $currency) || !preg_match('/^[A-Za-z0-9_\-]+$/', $network)){
+			exit('{"code":-1,"msg":"币种/网络仅允许字母数字下划线和连字符"}');
+		}
+		if(strlen($currency) > 30 || strlen($network) > 30){
+			exit('{"code":-1,"msg":"币种/网络长度不能超过 30"}');
+		}
+	}else{
+		// 按支付方式模式：忽略 currency/network，统一保存为空
+		$currency = '';
+		$network = '';
+	}
 	if($_POST['action'] == 'add'){
 		$name=trim($_POST['name']);
-		$type=intval($_POST['type']);
+		$type=$category===1 ? 0 : intval($_POST['type']);
 		$kind=intval($_POST['kind']);
 		$row=$DB->getRow("select * from pre_roll where name='$name' limit 1");
 		if($row)
 			exit('{"code":-1,"msg":"轮询组名称重复"}');
-		$sql = "INSERT INTO pre_roll (name, type, kind) VALUES ('{$name}', {$type}, {$kind})";
-		if($DB->exec($sql))exit('{"code":0,"msg":"新增轮询组成功！"}');
+		if($category === 1){
+			$dup = $DB->getRow("SELECT id FROM pre_roll WHERE category=1 AND currency=:c AND network=:n LIMIT 1", [':c'=>$currency, ':n'=>$network]);
+			if($dup) exit('{"code":-1,"msg":"该币种+网络已存在加密货币轮询组"}');
+		}
+		$ok = $DB->insert('roll', [
+			'name'     => $name,
+			'type'     => $type,
+			'kind'     => $kind,
+			'category' => $category,
+			'currency' => $currency,
+			'network'  => $network,
+		]);
+		if($ok)exit('{"code":0,"msg":"新增轮询组成功！"}');
 		else exit('{"code":-1,"msg":"新增轮询组失败['.$DB->error().']"}');
 	}else{
 		$id=intval($_POST['id']);
 		$name=trim($_POST['name']);
-		$type=intval($_POST['type']);
+		$type=$category===1 ? 0 : intval($_POST['type']);
 		$kind=intval($_POST['kind']);
 		$row=$DB->getRow("select * from pre_roll where name='$name' and id<>$id limit 1");
 		if($row)
 			exit('{"code":-1,"msg":"轮询组名称重复"}');
-		$sql = "UPDATE pre_roll SET name='{$name}',type='{$type}',kind='{$kind}' WHERE id='$id'";
-		if($DB->exec($sql)!==false)exit('{"code":0,"msg":"修改轮询组成功！"}');
+		if($category === 1){
+			$dup = $DB->getRow("SELECT id FROM pre_roll WHERE category=1 AND currency=:c AND network=:n AND id<>:id LIMIT 1", [':c'=>$currency, ':n'=>$network, ':id'=>$id]);
+			if($dup) exit('{"code":-1,"msg":"该币种+网络已存在加密货币轮询组"}');
+		}
+		$old = $DB->getRow("SELECT category,type,currency,network FROM pre_roll WHERE id='$id' LIMIT 1");
+		$shouldClearInfo = false;
+		if($old){
+			$oldCategory = (int)($old['category'] ?? 0);
+			if($oldCategory !== $category) $shouldClearInfo = true;
+			elseif($category === 1 && (strcasecmp((string)$old['currency'], $currency) !== 0 || strcasecmp((string)$old['network'], $network) !== 0)) $shouldClearInfo = true;
+			elseif($category === 0 && (int)$old['type'] !== $type) $shouldClearInfo = true;
+		}
+		$update = [
+			'name'     => $name,
+			'type'     => $type,
+			'kind'     => $kind,
+			'category' => $category,
+			'currency' => $currency,
+			'network'  => $network,
+		];
+		if($shouldClearInfo){
+			$update['info'] = '';
+			$update['index'] = 0;
+		}
+		if($DB->update('roll', $update, ['id'=>$id]) !== false)exit('{"code":0,"msg":"修改轮询组成功！"}');
 		else exit('{"code":-1,"msg":"修改轮询组失败['.$DB->error().']"}');
 	}
 break;
@@ -659,10 +714,20 @@ case 'rollInfo':
 	$row=$DB->getRow("select * from pre_roll where id='$id' limit 1");
 	if(!$row)
 		exit('{"code":-1,"msg":"当前轮询组不存在！"}');
-	$sql = "";
-	if($row['kind'] < 2) $sql = " AND status=1 ";
-	$list=$DB->getAll("select id,name from pre_channel where type='{$row['type']}'{$sql} ORDER BY id ASC");
-	if(!$list)exit('{"code":-1,"msg":"没有找到支持该支付方式的通道"}');
+	$statusSql = "";
+	if($row['kind'] < 2) $statusSql = " AND A.status=1 ";
+	$category = isset($row['category']) ? (int)$row['category'] : 0;
+	if($category === 1){
+		$cur = trim((string)($row['currency'] ?? ''));
+		$net = trim((string)($row['network'] ?? ''));
+		if($cur === '' || $net === '') exit('{"code":-1,"msg":"加密货币轮询组缺少币种或网络"}');
+		$list=$DB->getAll("SELECT A.id, CONCAT(A.name, ' [', B.showname, ']') AS name FROM pre_channel A INNER JOIN pre_type B ON A.type=B.id WHERE B.currency=:c AND B.network=:n {$statusSql} ORDER BY A.id ASC", [':c'=>$cur, ':n'=>$net]);
+		if(!$list)exit('{"code":-1,"msg":"没有找到币种='.$cur.' 网络='.$net.' 的支付通道，请先在支付方式中正确填写 currency/network"}');
+	}else{
+		$type = (int)$row['type'];
+		$list=$DB->getAll("SELECT A.id, A.name FROM pre_channel A WHERE A.type='{$type}' {$statusSql} ORDER BY A.id ASC");
+		if(!$list)exit('{"code":-1,"msg":"没有找到支持该支付方式的通道"}');
+	}
 	if(!empty($row['info'])){
 		$arr = explode(',',$row['info']);
 		$info = [];

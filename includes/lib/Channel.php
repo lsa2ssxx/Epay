@@ -362,6 +362,10 @@ class Channel {
 	 * 收银台三级菜单数据：先一级 currency 分组，每组下二级 networks 列表。
 	 * 复用 getTypes() 的可用方式过滤逻辑（含用户组、随机/轮询通道存活检查）。
 	 *
+	 * 当存在启用的「加密货币」轮询组（pre_roll.category=1）时：
+	 * 同一 (currency, network) 下的多个独立 pre_type 入口将合并为单个 roll 入口，
+	 * 渲染层据此生成 ?rollid=NN 的链接，由 submitByRoll() 路由到具体通道。
+	 *
 	 * @param int $uid
 	 * @param int $gid
 	 * @return array<int,array{
@@ -369,7 +373,8 @@ class Channel {
 	 *   sort:int,
 	 *   networks: array<int,array{
 	 *     typeid:int, name:string, showname:string, network:?string,
-	 *     network_label:string, rate:?string, sort:int
+	 *     network_label:string, rate:?string, sort:int,
+	 *     is_roll?:bool, roll_id?:int
 	 *   }>
 	 * }>
 	 */
@@ -419,6 +424,67 @@ class Channel {
 			];
 		}
 
+		// 合并加密货币轮询组：同一 (currency, network) 多入口合并为 1 个 roll 入口
+		$crypto_rolls = self::getCryptoRolls();
+		if (!empty($crypto_rolls)) {
+			foreach ($buckets as $cur => &$b) {
+				$cur_u = strtoupper($cur);
+				if (!isset($crypto_rolls[$cur_u])) continue;
+				$rolls_for_cur = $crypto_rolls[$cur_u];
+
+				$grouped_by_net = [];
+				foreach ($b['networks'] as $idx => $n) {
+					$key = strtoupper($n['network_label']);
+					$grouped_by_net[$key][] = $idx;
+				}
+
+				$new_networks = $b['networks'];
+				$drop_idx = [];
+				foreach ($grouped_by_net as $net_u => $idx_list) {
+					if (!isset($rolls_for_cur[$net_u])) continue;
+					$roll = $rolls_for_cur[$net_u];
+
+					$first_idx = $idx_list[0];
+					$first = $b['networks'][$first_idx];
+					$showname = $first['network_label'] !== ''
+						? ($cur.' · '.$first['network_label'])
+						: ($first['showname'] ?: $cur);
+
+					$rate_min = null;
+					foreach ($idx_list as $i) {
+						$r = isset($b['networks'][$i]['rate']) ? $b['networks'][$i]['rate'] : null;
+						if ($r === null || $r === '') continue;
+						if ($rate_min === null || (float) $r < (float) $rate_min) $rate_min = $r;
+					}
+
+					$new_networks[$first_idx] = [
+						'typeid'        => 0,
+						'name'          => $first['name'],
+						'showname'      => $showname,
+						'network'       => $first['network'],
+						'network_label' => $first['network_label'],
+						'rate'          => $rate_min,
+						'sort'          => $first['sort'],
+						'is_roll'       => true,
+						'roll_id'       => (int) $roll['id'],
+					];
+					for ($k = 1, $cnt = count($idx_list); $k < $cnt; $k++) {
+						$drop_idx[$idx_list[$k]] = true;
+					}
+				}
+				if (!empty($drop_idx)) {
+					$tmp = [];
+					foreach ($new_networks as $i => $row) {
+						if (!isset($drop_idx[$i])) $tmp[] = $row;
+					}
+					$b['networks'] = $tmp;
+				} else {
+					$b['networks'] = $new_networks;
+				}
+			}
+			unset($b);
+		}
+
 		foreach ($buckets as &$b) {
 			usort($b['networks'], function ($a, $c) {
 				if ($a['sort'] !== $c['sort']) {
@@ -440,6 +506,81 @@ class Channel {
 		});
 
 		return $out;
+	}
+
+	/**
+	 * 已启用的「按加密货币」轮询组（pre_roll.category=1），按 currency/network 索引。
+	 * 仅返回当前确实有可用通道的轮询组（避免在前台展示空入口）。
+	 *
+	 * @return array<string,array<string,array{id:int,kind:int}>>  形如 ['USDT'=>['TRC20'=>['id'=>3,'kind'=>0], ...], ...]
+	 */
+	static public function getCryptoRolls()
+	{
+		global $DB;
+		$rows = $DB->getAll("SELECT id,kind,currency,network,info FROM pre_roll WHERE category=1 AND status=1");
+		if (!is_array($rows) || count($rows) === 0) return [];
+		$out = [];
+		foreach ($rows as $row) {
+			$cur = strtoupper(trim((string) $row['currency']));
+			$net = strtoupper(trim((string) $row['network']));
+			if ($cur === '' || $net === '') continue;
+			if (empty($row['info'])) continue;
+			$out[$cur][$net] = ['id' => (int) $row['id'], 'kind' => (int) $row['kind']];
+		}
+		return $out;
+	}
+
+	/**
+	 * 走「加密货币」轮询组挑选最终通道。
+	 * 与 submit2() 返回结构一致；typeid 取自所选通道自身的 pre_channel.type。
+	 *
+	 * @param int $rollid
+	 * @param int $uid
+	 * @param int $gid
+	 * @param float|int $money
+	 * @return array|false
+	 */
+	static public function submitByRoll($rollid, $uid = 0, $gid = 0, $money = 0)
+	{
+		global $DB;
+		$rollid = (int) $rollid;
+		$row = $DB->getRow("SELECT * FROM pre_roll WHERE id='{$rollid}' AND category=1 AND status=1 LIMIT 1");
+		if (!$row) return false;
+
+		$channelid = self::getChannelFromRoll($row['id'], $money);
+		if (!$channelid) return false;
+
+		$ch = $DB->getRow("SELECT id,type,plugin,rate,apptype,mode,paymin,paymax,timestart,timestop FROM pre_channel WHERE id='{$channelid}' LIMIT 1");
+		if (!$ch) return false;
+
+		$typeid = (int) $ch['type'];
+		$paytype = $DB->getRow("SELECT id,name,status FROM pre_type WHERE id='{$typeid}' LIMIT 1");
+		if (!$paytype || $paytype['status'] == 0) return false;
+
+		$money_rate = $ch['rate'];
+		if ($gid > 0) $groupinfo = $DB->getColumn("SELECT info FROM pre_group WHERE gid='{$gid}' LIMIT 1");
+		if (empty($groupinfo)) $groupinfo = $DB->getColumn("SELECT info FROM pre_group WHERE gid=0 LIMIT 1");
+		if ($groupinfo) {
+			$info = json_decode($groupinfo, true);
+			if (isset($info[$typeid]) && is_array($info[$typeid]) && !empty($info[$typeid]['rate'])) {
+				$money_rate = $info[$typeid]['rate'];
+			}
+		}
+
+		return [
+			'typeid'      => $typeid,
+			'typename'    => $paytype['name'],
+			'plugin'      => $ch['plugin'],
+			'channel'     => (int) $ch['id'],
+			'subchannel'  => 0,
+			'rate'        => $money_rate,
+			'apptype'     => $ch['apptype'],
+			'mode'        => $ch['mode'],
+			'paymin'      => $ch['paymin'],
+			'paymax'      => $ch['paymax'],
+			'timestart'   => $ch['timestart'],
+			'timestop'    => $ch['timestop'],
+		];
 	}
 
 	//根据轮询组ID获取支付通道ID

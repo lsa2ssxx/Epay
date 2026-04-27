@@ -7,6 +7,7 @@ $submit2=true;
 @header('Content-Type: text/html; charset=UTF-8');
 
 $typeid=intval($_GET['typeid']);
+$rollid=isset($_GET['rollid']) ? intval($_GET['rollid']) : 0;
 $trade_no=daddslashes($_GET['trade_no']);
 $order=$DB->getRow("SELECT * FROM pre_order WHERE trade_no='{$trade_no}' LIMIT 1");
 if(!$order)sysmsg('该订单号不存在，请返回来源地重新发起请求！');
@@ -15,8 +16,11 @@ if($order['status']>0){
 }
 $firstGetChannel = true;
 if($order['type'] > 0 && $order['channel'] > 0 && $order['realmoney'] > 0 && $order['getmoney'] > 0){
-	if($typeid > 0 && $typeid != $order['type']){
-		// 用户在收银台重新选择了不同的支付方式：清空已分配的通道，按新选择重新走一遍流程
+	// 进入既有通道：rollid 重选时一律重选；typeid 与既有 type 不一致时也重选
+	$reselect = false;
+	if($rollid > 0) $reselect = true;
+	elseif($typeid > 0 && $typeid != $order['type']) $reselect = true;
+	if($reselect){
 		$DB->update('order', [
 			'type' => 0,
 			'channel' => 0,
@@ -42,9 +46,17 @@ $groupconfig = getGroupConfig($userrow['gid']);
 $conf = array_merge($conf, $groupconfig);
 
 if($firstGetChannel){
-	$submitData = \lib\Channel::submit2($typeid, $userrow['uid'], $userrow['gid'], $order['money']);
-	if(!$submitData){
-		sysmsg('<center>当前支付方式无法使用</center>', '跳转提示');
+	if($rollid > 0){
+		$submitData = \lib\Channel::submitByRoll($rollid, $userrow['uid'], $userrow['gid'], $order['money']);
+		if(!$submitData){
+			sysmsg('<center>当前轮询组无可用通道</center>', '跳转提示');
+		}
+		$typeid = $submitData['typeid'];
+	}else{
+		$submitData = \lib\Channel::submit2($typeid, $userrow['uid'], $userrow['gid'], $order['money']);
+		if(!$submitData){
+			sysmsg('<center>当前支付方式无法使用</center>', '跳转提示');
+		}
 	}
 
 	if($userrow['mode']==1 && $order['tid']!=4 || $order['tid']==2){ //订单加费模式（排除购买用户组）或余额充值

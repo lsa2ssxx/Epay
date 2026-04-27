@@ -151,7 +151,11 @@ CREATE TABLE `pre_roll` (
   `info` text DEFAULT NULL,
   `status` tinyint(1) NOT NULL DEFAULT '0',
   `index` int(11) NOT NULL DEFAULT '0',
- PRIMARY KEY (`id`)
+  `category` tinyint(1) NOT NULL DEFAULT 0,
+  `currency` varchar(30) DEFAULT NULL,
+  `network` varchar(30) DEFAULT NULL,
+ PRIMARY KEY (`id`),
+ KEY `idx_crypto` (`category`,`currency`,`network`,`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 AUTO_INCREMENT=101;
 
 DROP TABLE IF EXISTS `pre_weixin`;

@@ -103,7 +103,11 @@ function cm_render_currency_item($cat, $trade_no, $self, $qs_base)
 
 	if ($count === 1) {
 		$only = $cat['networks'][0];
-		$href = './submit2.php?typeid=' . (int) $only['typeid'] . '&trade_no=' . urlencode((string) $trade_no);
+		if (!empty($only['is_roll']) && !empty($only['roll_id'])) {
+			$href = './submit2.php?rollid=' . (int) $only['roll_id'] . '&trade_no=' . urlencode((string) $trade_no);
+		} else {
+			$href = './submit2.php?typeid=' . (int) $only['typeid'] . '&trade_no=' . urlencode((string) $trade_no);
+		}
 		$tag_h = htmlspecialchars($only['network_label'] !== '' ? $only['network_label'] : ($kind === 'fiat' ? 'Instant' : ''), ENT_QUOTES, 'UTF-8');
 	} else {
 		$href = $self . '?' . $qs_base . '&currency=' . urlencode($key);
@@ -148,10 +152,13 @@ function cm_render_network_item($net, $trade_no)
 	$showname_h = htmlspecialchars((string) $showname, ENT_QUOTES, 'UTF-8');
 	$short_h = htmlspecialchars((string) $short, ENT_QUOTES, 'UTF-8');
 	$tag_h = htmlspecialchars((string) $tag, ENT_QUOTES, 'UTF-8');
-	$tid = (int) $net['typeid'];
 	$search = strtolower($net['name'] . ' ' . $showname . ' ' . $tag);
 	$search_h = htmlspecialchars($search, ENT_QUOTES, 'UTF-8');
-	$href = './submit2.php?typeid=' . $tid . '&trade_no=' . urlencode((string) $trade_no);
+	if (!empty($net['is_roll']) && !empty($net['roll_id'])) {
+		$href = './submit2.php?rollid=' . (int) $net['roll_id'] . '&trade_no=' . urlencode((string) $trade_no);
+	} else {
+		$href = './submit2.php?typeid=' . (int) $net['typeid'] . '&trade_no=' . urlencode((string) $trade_no);
+	}
 	$href_h = htmlspecialchars($href, ENT_QUOTES, 'UTF-8');
 
 	$html = '<a class="cm-item" href="' . $href_h . '" data-search="' . $search_h . '">';
@@ -180,7 +187,11 @@ if ($cm_currency_param !== '') {
 	// 二级若只有 1 个网络，直接 302 进入支付通道
 	if ($cm_active_cat && count($cm_active_cat['networks']) === 1) {
 		$only = $cm_active_cat['networks'][0];
-		header('Location: ./submit2.php?typeid=' . (int) $only['typeid'] . '&trade_no=' . urlencode($trade_no), true, 302);
+		if (!empty($only['is_roll']) && !empty($only['roll_id'])) {
+			header('Location: ./submit2.php?rollid=' . (int) $only['roll_id'] . '&trade_no=' . urlencode($trade_no), true, 302);
+		} else {
+			header('Location: ./submit2.php?typeid=' . (int) $only['typeid'] . '&trade_no=' . urlencode($trade_no), true, 302);
+		}
 		exit;
 	}
 }
