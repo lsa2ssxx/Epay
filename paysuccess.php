@@ -54,13 +54,11 @@ if ($order_paid) {
 	} else {
 		$state = 'completed';
 	}
-} elseif ($has_detected) {
-	$state = 'detected';
 } else {
 	header('Location: /cashier.php?trade_no=' . urlencode($trade_no));
 	exit;
 }
-$chain_pending = !$order_paid && $state === 'detected' && $has_detected;
+$chain_pending = false;
 
 /* ---------- 展示字段组装 ---------- */
 $cm_site_name = isset($conf['sitename']) && $conf['sitename'] !== ''

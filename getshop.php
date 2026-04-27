@@ -43,23 +43,7 @@ default:
 		}
 		echo json_encode($resp);
 	}else{
-		// 中间态：链上已检测、尚未确认
-		$detected = false;
-		if($type === 'crypto' && !empty($row['ext'])){
-			$ext = @unserialize($row['ext']);
-			if(is_array($ext) && !empty($ext['detected_at'])){
-				$detected = true;
-			}
-		}
-		if($detected){
-			echo json_encode([
-				'code'           => 2,
-				'msg'            => '付款已检测',
-				'paysuccess_url' => $paysuccess_url . '&state=detected',
-			]);
-		}else{
-			echo json_encode(['code'=>-1, 'msg'=>'未付款']);
-		}
+		echo json_encode(['code'=>-1, 'msg'=>'未付款']);
 	}
 break;
 }
