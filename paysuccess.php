@@ -2,12 +2,8 @@
 /**
  * 加密货币收银台支付结果过渡页
  *
- * 统一展示两个中间态：
- *   - state=detected  链上已检测到付款，等待确认
- *   - state=completed 付款已确认完成，可返回商家
- *
- * 页面风格延续 cashier-modern（Coinify 风格），仅加密货币通道会自动跳转到此页。
- * 其它支付方式仍沿用原 getshop.php 回跳商户的流程。
+ * 统一展示：「已检测」→「已完成」；state=detected&staged=1+已付 为各通道共用的纯展示过渡（无链上则文案为系统确认）。
+ * 无 staged、未付、有 detected_at：链上待确认。state=completed：可返回商家。
  */
 $is_defend = true;
 $nosession = true;
@@ -20,6 +16,7 @@ $state    = isset($_GET['state']) ? daddslashes($_GET['state']) : 'completed';
 if ($state !== 'detected' && $state !== 'completed') {
 	$state = 'completed';
 }
+$staged = isset($_GET['staged']) && (string) $_GET['staged'] === '1';
 
 if ($trade_no === '') {
 	sysmsg('缺少订单号参数');
@@ -39,16 +36,31 @@ if (!empty($row['ext'])) {
 	if (is_array($decoded)) $ext = $decoded;
 }
 
-$has_detected = !empty($ext['detected_at']);
-$order_paid   = $row['status'] >= 1;
+$has_detected  = !empty($ext['detected_at']);
+$order_paid    = (int) $row['status'] === 1;
+$order_error   = (int) $row['status'] === 2;
+$ux_staged     = false;
 
-// 状态判定规则：
-//   - URL 上的 state 是视觉层的显式请求（由 crypto.php 统一先进入 detected 做过渡）
-//   - 仅当 URL 请求 completed 但订单实际未确认时，回退到 detected 避免误导
-//   - 其余情况尊重 URL 请求，由前端 JS 决定何时自动切到 completed
-if ($state === 'completed' && !$order_paid) {
-	$state = 'detected';
+if ($order_error) {
+	header('Location: /payerr.html');
+	exit;
 }
+// staged=1 + 已支付：展示用「已检测」过渡，再到 completed（非链上无 detected_at 也可，纯 UX）
+// 未支付 + 有链上 detected_at：真实「待确认」
+// 已支付 且 非 (staged&detected)：直接看完成页
+if ($order_paid) {
+	if ($staged && $state === 'detected') {
+		$ux_staged = true;
+	} else {
+		$state = 'completed';
+	}
+} elseif ($has_detected) {
+	$state = 'detected';
+} else {
+	header('Location: /cashier.php?trade_no=' . urlencode($trade_no));
+	exit;
+}
+$chain_pending = !$order_paid && $state === 'detected' && $has_detected;
 
 /* ---------- 展示字段组装 ---------- */
 $cm_site_name = isset($conf['sitename']) && $conf['sitename'] !== ''
@@ -89,8 +101,13 @@ if ($state === 'completed') {
 	$cm_btn     = '返回商家';
 } else {
 	$cm_title   = '付款已检测';
-	$cm_desc    = '您的付款已出现在区块链上。一旦确认完成，商户将收到通知，订单即可完成。';
-	$cm_desc2   = '付款确认后您将会收到一封电子邮件通知。';
+	if ($ux_staged && !$has_detected) {
+		$cm_desc  = '系统已收到成功支付结果，正在完成订单确认…';
+		$cm_desc2 = '';
+	} else {
+		$cm_desc  = '您的付款已出现在区块链上。一旦确认完成，商户将收到通知，订单即可完成。';
+		$cm_desc2 = '付款确认后您将会收到一封电子邮件通知。';
+	}
 	$cm_btn     = '返回商家';
 }
 
@@ -214,7 +231,9 @@ window.CM_CONFIG = {
 };
 window.CM_PAYSUCCESS = {
 	tradeNo: <?php echo json_encode($trade_no); ?>,
-	state: <?php echo json_encode($state); ?>
+	state: <?php echo json_encode($state); ?>,
+	uxStaged: <?php echo !empty($ux_staged) ? 'true' : 'false'; ?>,
+	chainPending: <?php echo !empty($chain_pending) ? 'true' : 'false'; ?>
 };
 </script>
 <script src="/assets/js/cashier-modern.js?v=3"></script>
@@ -223,6 +242,8 @@ window.CM_PAYSUCCESS = {
 	var cfg = window.CM_PAYSUCCESS || {};
 	var tradeNo = cfg.tradeNo;
 	var currentState = cfg.state;
+	var uxStaged = cfg.uxStaged === true;
+	var chainPending = cfg.chainPending === true;
 
 	// 复制按钮（同 crypto.php 的 fallback 行为）
 	document.addEventListener('click', function(e){
@@ -282,7 +303,7 @@ window.CM_PAYSUCCESS = {
 
 	function fetchBackUrl(cb){
 		var xhr = new XMLHttpRequest();
-		xhr.open('GET', '/getshop.php?type=crypto&trade_no=' + encodeURIComponent(tradeNo), true);
+		xhr.open('GET', '/getshop.php?trade_no=' + encodeURIComponent(tradeNo), true);
 		xhr.onreadystatechange = function(){
 			if (xhr.readyState !== 4) return;
 			try {
@@ -299,9 +320,9 @@ window.CM_PAYSUCCESS = {
 		xhr.send();
 	}
 
-	// detected 状态下继续轮询，一旦确认成功则自动切换到 completed
-	// 为了保证视觉过渡自然，detected 状态至少展示 MIN_DETECTED_MS 毫秒
-	var MIN_DETECTED_MS = 3500;
+	// 链上待确认：轮询到 code=1 再进 completed；staged+已付：纯展示后进入
+	var MIN_STAGED_MS = 2200;
+	var MIN_CHAIN_MS = 3500;
 	var loadedAt = Date.now();
 	var transitioned = false;
 
@@ -311,22 +332,23 @@ window.CM_PAYSUCCESS = {
 		window.location.href = '/paysuccess.php?trade_no=' + encodeURIComponent(tradeNo) + '&state=completed';
 	}
 
-	function scheduleGoCompleted(){
+	function scheduleGoCompleted(floorMs){
+		var min = floorMs != null ? floorMs : (uxStaged ? MIN_STAGED_MS : MIN_CHAIN_MS);
 		var elapsed = Date.now() - loadedAt;
-		var wait = Math.max(0, MIN_DETECTED_MS - elapsed);
+		var wait = Math.max(0, min - elapsed);
 		setTimeout(goCompleted, wait);
 	}
 
 	function pollForComplete(){
 		if (currentState !== 'detected' || transitioned) return;
 		var xhr = new XMLHttpRequest();
-		xhr.open('GET', '/getshop.php?type=crypto&trade_no=' + encodeURIComponent(tradeNo), true);
+		xhr.open('GET', '/getshop.php?trade_no=' + encodeURIComponent(tradeNo), true);
 		xhr.onreadystatechange = function(){
 			if (xhr.readyState !== 4) return;
 			try {
 				var d = JSON.parse(xhr.responseText);
 				if (d && d.code == 1) {
-					scheduleGoCompleted();
+					scheduleGoCompleted(MIN_CHAIN_MS);
 					return;
 				}
 			} catch(e) {}
@@ -334,8 +356,9 @@ window.CM_PAYSUCCESS = {
 		};
 		xhr.send();
 	}
-	if (currentState === 'detected') {
-		// 首次立即查询一次，避免进入时订单已确认却还要等 3s 才触发轮询
+	if (currentState === 'detected' && uxStaged) {
+		scheduleGoCompleted(MIN_STAGED_MS);
+	} else if (currentState === 'detected' && chainPending) {
 		setTimeout(pollForComplete, 800);
 	}
 })();

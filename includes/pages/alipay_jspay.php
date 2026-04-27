@@ -24,6 +24,7 @@ if(!defined('IN_PLUGIN'))exit();
     </div>
 <script src="<?php echo $cdnpublic?>jquery/1.12.4/jquery.min.js"></script>
 <script src="<?php echo $cdnpublic?>layer/3.1.1/layer.js"></script>
+<script src="/assets/js/pay-success-bridge.js?v=1"></script>
 <script>
 document.body.addEventListener('touchmove', function (event) {
 	event.preventDefault();
@@ -66,9 +67,10 @@ function loadmsg() {
 		url: "/getshop.php",
 		data: {type: "wxpay", trade_no: "<?php echo TRADE_NO?>"},
 		success: function (data) {
+			if (window.epayOnPaid && epayOnPaid(data)) return;
 			if (data.code == 1) {
 				layer.msg('支付成功，正在跳转中...', {icon: 16,shade: 0.01,time: 15000});
-				window.location.href=<?php echo $redirect_url?>;
+				window.location.href = (data && data.backurl) ? data.backurl : <?php echo json_encode($redirect_url, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE); ?>;
 			}else{
 				setTimeout("loadmsg()", 2000);
 			}

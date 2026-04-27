@@ -37,9 +37,9 @@ default:
 			$jumpurl = '/payerr.html';
 		}
 		$resp = ['code'=>1, 'msg'=>'付款成功', 'backurl'=>$jumpurl];
-		// 加密货币收银台：默认跳转到站内「付款已完成」过渡页，由用户主动返回商家
-		if($type === 'crypto' && $row['status'] == 1){
-			$resp['paysuccess_url'] = $paysuccess_url . '&state=completed';
+		// 成功订单：先进入站内「已检测」过渡（staged=1 可配合非链上通道做纯展示），再到 paysuccess?completed
+		if($row['status'] == 1){
+			$resp['paysuccess_url'] = $paysuccess_url . '&state=detected&staged=1';
 		}
 		echo json_encode($resp);
 	}else{

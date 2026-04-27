@@ -46,6 +46,7 @@ if (!defined('IN_PLUGIN'))
         </div>
         <script src="<?php echo $cdnpublic ?>jquery/1.12.4/jquery.min.js"></script>
         <script src="<?php echo $cdnpublic ?>layer/3.1.1/layer.js"></script>
+        <script src="/assets/js/pay-success-bridge.js?v=1"></script>
         <script>
             var url_scheme = '<?php echo $code_url ?>';
             function loadmsg() {
@@ -55,9 +56,10 @@ if (!defined('IN_PLUGIN'))
                     url: "/getshop.php",
                     data: { type: "wxpay", trade_no: "<?php echo $order['trade_no'] ?>" },
                     success: function (data) {
+                        if (window.epayOnPaid && epayOnPaid(data)) return;
                         if (data.code == 1) {
                             layer.msg('支付成功，正在跳转中...', { icon: 16, shade: 0.01, time: 15000 });
-                            setTimeout(window.location.href = <?php echo $redirect_url ?>, 1000);
+                            setTimeout(function () { window.location.href = (data && data.backurl) ? data.backurl : <?php echo json_encode($redirect_url, JSON_UNESCAPED_SLASHES); ?>; }, 1000);
                         } else {
                             setTimeout("loadmsg()", 2000);
                         }
@@ -74,9 +76,10 @@ if (!defined('IN_PLUGIN'))
                     url: "/getshop.php",
                     data: { type: "wxpay", trade_no: "<?php echo $order['trade_no'] ?>" },
                     success: function (data) {
+                        if (window.epayOnPaid && epayOnPaid(data)) return;
                         if (data.code == 1) {
                             layer.msg('支付成功，正在跳转中...', { icon: 16, shade: 0.01, time: 15000 });
-                            setTimeout(window.location.href = <?php echo $redirect_url ?>, 1000);
+                            setTimeout(function () { window.location.href = (data && data.backurl) ? data.backurl : <?php echo json_encode($redirect_url, JSON_UNESCAPED_SLASHES); ?>; }, 1000);
                         } else {
                             layer.msg('您还未完成付款，请继续付款', { shade: 0, time: 1500 });
                         }

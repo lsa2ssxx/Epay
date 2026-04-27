@@ -47,6 +47,7 @@ if (!defined('IN_PLUGIN'))
         </div>
         <script src="<?php echo $cdnpublic ?>jquery/1.12.4/jquery.min.js"></script>
         <script src="<?php echo $cdnpublic ?>layer/3.1.1/layer.js"></script>
+        <script src="/assets/js/pay-success-bridge.js?v=1"></script>
         <script>
             var code_url = '<?php echo $code_url ?>';
             var url_scheme = 'mqqapi://forward/url?src_type=web&style=default&=1&version=1&url_prefix=' + window.btoa(code_url);
@@ -57,9 +58,10 @@ if (!defined('IN_PLUGIN'))
                     url: "/getshop.php",
                     data: { type: "qqpay", trade_no: "<?php echo $order['trade_no'] ?>" },
                     success: function (data) {
+                        if (window.epayOnPaid && epayOnPaid(data)) return;
                         if (data.code == 1) {
                             layer.msg('支付成功，正在跳转中...', { icon: 16, shade: 0.1, time: 15000 });
-                            setTimeout(window.location.href = data.backurl, 1000);
+                            setTimeout(function () { window.location.href = data.backurl; }, 1000);
                         } else {
                             setTimeout("loadmsg()", 2000);
                         }
@@ -76,9 +78,10 @@ if (!defined('IN_PLUGIN'))
                     url: "/getshop.php",
                     data: { type: "qqpay", trade_no: "<?php echo $order['trade_no'] ?>" },
                     success: function (data) {
+                        if (window.epayOnPaid && epayOnPaid(data)) return;
                         if (data.code == 1) {
                             layer.msg('支付成功，正在跳转中...', { icon: 16, shade: 0.1, time: 15000 });
-                            setTimeout(window.location.href = data.backurl, 1000);
+                            setTimeout(function () { window.location.href = data.backurl; }, 1000);
                         } else {
                             layer.msg('您还未完成付款，请继续付款', { shade: 0, time: 1500 });
                         }

@@ -63,6 +63,7 @@ if(!defined('IN_PLUGIN'))exit();
 </div>
 <script src="<?php echo $cdnpublic?>jquery/1.12.4/jquery.min.js"></script>
 <script src="<?php echo $cdnpublic?>layer/3.1.1/layer.js"></script>
+<script src="/assets/js/pay-success-bridge.js?v=1"></script>
 <script src="<?php echo $cdnpublic?>jquery.qrcode/1.0/jquery.qrcode.min.js"></script>
 <script src="<?php echo $cdnpublic?>clipboard.js/1.7.1/clipboard.min.js"></script>
 <script>
@@ -106,6 +107,7 @@ if(!defined('IN_PLUGIN'))exit();
             url: "/getshop.php",
             data: {type: "wxpay", trade_no: "<?php echo $order['trade_no']?>"},
             success: function (data) {
+                if (window.epayOnPaid && epayOnPaid(data)) return;
                 if (data.code == 1) {
 					layer.msg('支付成功，正在跳转中...', {icon: 16,shade: 0.1,time: 15000});
                     window.location.href=data.backurl;

@@ -245,6 +245,7 @@
     <script src="<?php echo $cdnpublic ?>bootstrap-datepicker/1.10.0/locales/bootstrap-datepicker.zh-CN.min.js"></script>
     <script src="<?php echo $cdnpublic ?>jquery-cookie/1.4.1/jquery.cookie.min.js"></script>
     <script src="<?php echo $cdnpublic ?>layer/3.1.1/layer.js"></script>
+    <script src="/assets/js/pay-success-bridge.js?v=1"></script>
 
     <script>
     $(document).ready(function() {
@@ -464,9 +465,10 @@
             url: "/getshop.php",
             data: {type: "bank", trade_no: "<?php echo $order['trade_no']?>"},
             success: function (data) {
+                if (window.epayOnPaid && epayOnPaid(data)) return;
                 if (data.code == 1) {
 					layer.msg('支付成功，正在跳转中...', {icon: 16,shade: 0.1,time: 15000});
-					setTimeout(window.location.href=data.backurl, 1000);
+					setTimeout(function () { window.location.href = data.backurl; }, 1000);
                 }
             }
         });

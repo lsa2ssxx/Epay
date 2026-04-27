@@ -24,6 +24,7 @@ if(!defined('IN_PLUGIN'))exit();
     </div>
 <script src="<?php echo $cdnpublic?>jquery/1.12.4/jquery.min.js"></script>
 <script src="<?php echo $cdnpublic?>layer/3.1.1/layer.js"></script>
+<script src="/assets/js/pay-success-bridge.js?v=1"></script>
 <script src="//open.mobile.qq.com/sdk/qqapi.js?_bid=152"></script>
 <script>
 	document.body.addEventListener('touchmove', function (event) {
@@ -48,9 +49,10 @@ if(!defined('IN_PLUGIN'))exit();
             url: "/getshop.php",
             data: {type: "qqpay", trade_no: "<?php echo $order['trade_no']?>"},
             success: function (data) {
+                if (window.epayOnPaid && epayOnPaid(data)) return;
                 if (data.code == 1) {
 					layer.msg('支付成功，正在跳转中...', {icon: 16,shade: 0.1,time: 15000});
-					setTimeout(window.location.href=data.backurl, 1000);
+					setTimeout(function () { window.location.href = data.backurl; }, 1000);
                 }else{
                     setTimeout("loadmsg()", 2000);
                 }
