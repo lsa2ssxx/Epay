@@ -1,6 +1,6 @@
 <?php
 error_reporting(0);
-define('DB_VERSION', '2055');
+define('DB_VERSION', '2056');
 require '../config.php';
 
 @header('Content-Type: text/html; charset=UTF-8');
@@ -16,20 +16,27 @@ $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_SILENT);
 $db->exec("set sql_mode = ''");
 $db->exec("set names utf8");
 
+$configTable = '`'.$dbconfig['dbqz'].'_config`';
 $version = 0;
-if($rs = $db->query("SELECT v FROM pay_config WHERE k='version'")){
-	$version = $rs->fetchColumn();
+if($rs = $db->query("SELECT v FROM {$configTable} WHERE k='version' LIMIT 1")){
+	$version = (int)$rs->fetchColumn();
 }
 
-if($version==DB_VERSION){
+if($version === (int)DB_VERSION){
 	exit('你的网站已经升级到最新版本了');
-}elseif($version<2044){
-	$sqls = file_get_contents('update2.sql');
-	$sqls .= file_get_contents('update3.sql');
+}elseif($version < 2044){
+	$sqls = file_get_contents(__DIR__.'/update2.sql');
+	$sqls .= file_get_contents(__DIR__.'/update3.sql');
+	$sqls .= file_get_contents(__DIR__.'/update4.sql');
 	$sqls=explode(';', $sqls);
 	$sqls[]="UPDATE `pre_config` SET `v` = '".DB_VERSION."' where `k` = 'version'";
-}elseif($version<DB_VERSION){
-	$sqls = file_get_contents('update3.sql');
+}elseif($version < 2055){
+	$sqls = file_get_contents(__DIR__.'/update3.sql');
+	$sqls .= file_get_contents(__DIR__.'/update4.sql');
+	$sqls=explode(';', $sqls);
+	$sqls[]="UPDATE `pre_config` SET `v` = '".DB_VERSION."' where `k` = 'version'";
+}elseif($version < 2056){
+	$sqls = file_get_contents(__DIR__.'/update4.sql');
 	$sqls=explode(';', $sqls);
 	$sqls[]="UPDATE `pre_config` SET `v` = '".DB_VERSION."' where `k` = 'version'";
 }else{
