@@ -117,22 +117,26 @@ class Channel {
 		$typeid = $paytype['id'];
 		$typename = $paytype['name'];
 
-		return self::getSubmitInfo($typeid, $typename, $uid, $gid, $money, $sub_mch_id);
+		return self::getSubmitInfo($typeid, $typename, $uid, $gid, $money, $sub_mch_id, false, true);
 	}
 
 	// 支付提交处理2（输入支付方式ID）
-	static public function submit2($typeid, $uid=0, $gid=0, $money=0){
+	static public function submit2($typeid, $uid=0, $gid=0, $money=0, $cashierFront=false){
 		global $DB;
 		$paytype=$DB->getRow("SELECT id,name,status FROM pre_type WHERE id='$typeid' LIMIT 1");
 		if(!$paytype || $paytype['status']==0)sysmsg('支付方式(type)不存在');
 		$typename = $paytype['name'];
 
-		return self::getSubmitInfo($typeid, $typename, $uid, $gid, $money);
+		return self::getSubmitInfo($typeid, $typename, $uid, $gid, $money, 0, $cashierFront, true);
 	}
 
 	//获取通道、插件、费率信息
-	static public function getSubmitInfo($typeid, $typename, $uid, $gid, $money, $sub_mch_id=0){
+	static public function getSubmitInfo($typeid, $typename, $uid, $gid, $money, $sub_mch_id=0, $cashierFront=false, $applySideEffects=true){
 		global $DB;
+		$cashierFront = (bool)$cashierFront;
+		$applySideEffects = (bool)$applySideEffects;
+		$csCh = $cashierFront ? ' AND cashier_ok=1' : '';
+		$csA = $cashierFront ? ' AND A.cashier_ok=1' : '';
 		if($gid>0)$groupinfo=$DB->getColumn("SELECT info FROM pre_group WHERE gid='$gid' LIMIT 1");
 		if(!$groupinfo)$groupinfo=$DB->getColumn("SELECT info FROM pre_group WHERE gid=0 LIMIT 1");
 		if($groupinfo){
@@ -150,7 +154,7 @@ class Channel {
 				return false;
 			}
 			elseif($channel==-1){ //随机可用通道
-				$rows=$DB->getAll("SELECT id,plugin,status,rate,apptype,mode,paymin,paymax,timestart,timestop FROM pre_channel WHERE type='$typeid' AND status=1 AND daystatus=0 ORDER BY id ASC");
+				$rows=$DB->getAll("SELECT id,plugin,status,rate,apptype,mode,paymin,paymax,timestart,timestop FROM pre_channel WHERE type='$typeid' AND status=1 AND daystatus=0{$csCh} ORDER BY id ASC");
 				if(count($rows)>0){
 					$newrows = [];
 					foreach($rows as $row){
@@ -176,7 +180,7 @@ class Channel {
 				}
 			}
 			elseif($channel==-4){ //顺序可用通道
-				$rows=$DB->getAll("SELECT id,plugin,status,rate,apptype,mode,paymin,paymax,timestart,timestop FROM pre_channel WHERE type='$typeid' AND status=1 AND daystatus=0 ORDER BY id ASC");
+				$rows=$DB->getAll("SELECT id,plugin,status,rate,apptype,mode,paymin,paymax,timestart,timestop FROM pre_channel WHERE type='$typeid' AND status=1 AND daystatus=0{$csCh} ORDER BY id ASC");
 				if(count($rows)>0){
 					$newrows = [];
 					foreach($rows as $row){
@@ -196,14 +200,16 @@ class Channel {
 					$index = $DB->getColumn("SELECT `index` FROM pre_group WHERE gid='$gid' LIMIT 1");
 					$index = $index % count($newrows);
 					$row = $newrows[$index];
-					$index = ($index + 1) % count($newrows);
-					$DB->exec("UPDATE pre_group SET `index`='$index' WHERE gid='$gid'");
+					if($applySideEffects){
+						$index = ($index + 1) % count($newrows);
+						$DB->exec("UPDATE pre_group SET `index`='$index' WHERE gid='$gid'");
+					}
 					if(empty($money_rate))$money_rate = $row['rate'];
 					return ['typeid'=>$typeid, 'typename'=>$typename, 'plugin'=>$row['plugin'], 'channel'=>$row['id'], 'subchannel'=>0, 'rate'=>$money_rate, 'apptype'=>$row['apptype'], 'mode'=>$row['mode'], 'paymin'=>$row['paymin'], 'paymax'=>$row['paymax']];
 				}
 			}
 			elseif($channel==-5){ //首个可用通道
-				$rows=$DB->getAll("SELECT id,plugin,status,rate,apptype,mode,paymin,paymax,timestart,timestop FROM pre_channel WHERE type='$typeid' AND status=1 AND daystatus=0 ORDER BY id ASC");
+				$rows=$DB->getAll("SELECT id,plugin,status,rate,apptype,mode,paymin,paymax,timestart,timestop FROM pre_channel WHERE type='$typeid' AND status=1 AND daystatus=0{$csCh} ORDER BY id ASC");
 				if(count($rows)>0){
 					$newrows = [];
 					foreach($rows as $row){
@@ -230,7 +236,7 @@ class Channel {
 				if($sub_mch_id>0){
 					$sql = " AND B.apply_id='$sub_mch_id'";
 				}
-				$rows=$DB->getAll("SELECT A.id,plugin,A.status,rate,apptype,mode,paymin,paymax,B.id subid,timestart,timestop FROM pre_subchannel B INNER JOIN pre_channel A ON B.channel=A.id WHERE B.uid='$uid' AND A.type='$typeid' AND A.status=1 AND B.status=1 AND daystatus=0{$sql} ORDER BY B.usetime ASC");
+				$rows=$DB->getAll("SELECT A.id,plugin,A.status,rate,apptype,mode,paymin,paymax,B.id subid,timestart,timestop FROM pre_subchannel B INNER JOIN pre_channel A ON B.channel=A.id WHERE B.uid='$uid' AND A.type='$typeid' AND A.status=1 AND B.status=1 AND daystatus=0{$csA}{$sql} ORDER BY B.usetime ASC");
 				if(count($rows)>0){
 					$newrows = [];
 					foreach($rows as $row){
@@ -252,7 +258,9 @@ class Channel {
 						$row = $rows[0];
 					}
 					if(empty($money_rate))$money_rate = $row['rate'];
-					$DB->exec("UPDATE pre_subchannel SET usetime=NOW() WHERE id='{$row['subid']}'");
+					if($applySideEffects){
+						$DB->exec("UPDATE pre_subchannel SET usetime=NOW() WHERE id='{$row['subid']}'");
+					}
 					return ['typeid'=>$typeid, 'typename'=>$typename, 'plugin'=>$row['plugin'], 'channel'=>$row['id'], 'subchannel'=>$row['subid'], 'rate'=>$money_rate, 'apptype'=>$row['apptype'], 'mode'=>$row['mode'], 'paymin'=>$row['paymin'], 'paymax'=>$row['paymax']];
 				}
 			}
@@ -269,19 +277,22 @@ class Channel {
 			else{
 				ROLL_START:
 				if($groupinfo['type']=='roll'){ //解析轮询组
-					$channel = self::getChannelFromRoll($channel, $money);
+					$channel = self::getChannelFromRoll($channel, $money, $cashierFront, $applySideEffects);
 					if(!$channel || $channel==0){ //当前轮询组未开启
 						return false;
 					}
 				}
 				//获取轮询组对应通道
-				$row=$DB->getRow("SELECT plugin,status,rate,apptype,mode,paymin,paymax,timestart,timestop FROM pre_channel WHERE id='$channel' LIMIT 1");
+				$row=$DB->getRow("SELECT plugin,status,rate,apptype,mode,paymin,paymax,timestart,timestop,cashier_ok FROM pre_channel WHERE id='$channel' LIMIT 1");
+				if($cashierFront && $row && isset($row['cashier_ok']) && (int)$row['cashier_ok'] === 0){
+					return false;
+				}
 				if(empty($money_rate))$money_rate = $row['rate'];
 				return ['typeid'=>$typeid, 'typename'=>$typename, 'plugin'=>$row['plugin'], 'channel'=>$channel, 'subchannel'=>0, 'rate'=>$money_rate, 'apptype'=>$row['apptype'], 'mode'=>$row['mode'], 'paymin'=>$row['paymin'], 'paymax'=>$row['paymax'],'timestart'=>$row['timestart'],'timestop'=>$row['timestop']];
 			}
 		}else{
 			//未设置用户组
-			$row=$DB->getRow("SELECT id,plugin,status,rate,apptype,mode,paymin,paymax,timestart,timestop FROM pre_channel WHERE type='$typeid' AND status=1 AND daystatus=0 ORDER BY rand() LIMIT 1");
+			$row=$DB->getRow("SELECT id,plugin,status,rate,apptype,mode,paymin,paymax,timestart,timestop FROM pre_channel WHERE type='$typeid' AND status=1 AND daystatus=0{$csCh} ORDER BY rand() LIMIT 1");
 			if($row){
 				return ['typeid'=>$typeid, 'typename'=>$typename, 'plugin'=>$row['plugin'], 'channel'=>$row['id'], 'subchannel'=>0, 'rate'=>$row['rate'], 'apptype'=>$row['apptype'], 'mode'=>$row['mode'], 'paymin'=>$row['paymin'], 'paymax'=>$row['paymax'],'timestart'=>$row['timestart'],'timestop'=>$row['timestop']];
 			}
@@ -374,21 +385,29 @@ class Channel {
 	 *   networks: array<int,array{
 	 *     typeid:int, name:string, showname:string, network:?string,
 	 *     network_label:string, rate:?string, sort:int,
-	 *     is_roll?:bool, roll_id?:int
+	 *     is_roll?:bool, roll_id?:int, cashier_ready?:bool
 	 *   }>
 	 * }>
 	 */
-	static public function getCategorizedTypes($uid, $gid = 0)
+	static public function getCategorizedTypes($uid, $gid = 0, $orderMoney = 0)
 	{
 		require_once SYSTEM_ROOT.'pay_type_category.php';
 		$paytype = self::getTypes($uid, $gid);
 		if (!is_array($paytype) || count($paytype) === 0) {
 			return [];
 		}
+		$orderMoney = (float) $orderMoney;
 
 		$net_sort_map = pay_type_category_network_sort_map();
 		$buckets = [];
 		foreach ($paytype as $pt) {
+			$tid = (int) $pt['id'];
+			$tname = (string) ($pt['name'] ?? '');
+			if (self::getSubmitInfo($tid, $tname, $uid, $gid, $orderMoney, 0, false, false) === false) {
+				continue;
+			}
+			$cashierReady = self::getSubmitInfo($tid, $tname, $uid, $gid, $orderMoney, 0, true, false) !== false;
+
 			$resolved = pay_type_category_resolve($pt);
 			$cur = $resolved['currency'];
 			$net = $resolved['network'];
@@ -414,13 +433,14 @@ class Channel {
 			$net_sort = $net_sort_user > 0 ? $net_sort_user : $net_sort_default;
 
 			$buckets[$cur]['networks'][] = [
-				'typeid'        => (int) $pt['id'],
-				'name'          => (string) $pt['name'],
-				'showname'      => (string) ($pt['showname'] ?: $pt['name']),
-				'network'       => $net,
-				'network_label' => $net_label,
-				'rate'          => isset($pt['rate']) ? (string) $pt['rate'] : null,
-				'sort'          => $net_sort,
+				'typeid'         => $tid,
+				'name'           => (string) $pt['name'],
+				'showname'       => (string) ($pt['showname'] ?: $pt['name']),
+				'network'        => $net,
+				'network_label'  => $net_label,
+				'rate'           => isset($pt['rate']) ? (string) $pt['rate'] : null,
+				'sort'           => $net_sort,
+				'cashier_ready'  => $cashierReady,
 			];
 		}
 
@@ -443,6 +463,9 @@ class Channel {
 				foreach ($grouped_by_net as $net_u => $idx_list) {
 					if (!isset($rolls_for_cur[$net_u])) continue;
 					$roll = $rolls_for_cur[$net_u];
+					if (self::rollViablePoolForRollId((int) $roll['id'], $orderMoney, false) === null) {
+						continue;
+					}
 
 					$first_idx = $idx_list[0];
 					$first = $b['networks'][$first_idx];
@@ -457,16 +480,19 @@ class Channel {
 						if ($rate_min === null || (float) $r < (float) $rate_min) $rate_min = $r;
 					}
 
+					$rollCashierReady = self::rollViablePoolForRollId((int) $roll['id'], $orderMoney, true) !== null;
+
 					$new_networks[$first_idx] = [
-						'typeid'        => 0,
-						'name'          => $first['name'],
-						'showname'      => $showname,
-						'network'       => $first['network'],
-						'network_label' => $first['network_label'],
-						'rate'          => $rate_min,
-						'sort'          => $first['sort'],
-						'is_roll'       => true,
-						'roll_id'       => (int) $roll['id'],
+						'typeid'         => 0,
+						'name'           => $first['name'],
+						'showname'       => $showname,
+						'network'        => $first['network'],
+						'network_label'  => $first['network_label'],
+						'rate'           => $rate_min,
+						'sort'           => $first['sort'],
+						'is_roll'        => true,
+						'roll_id'        => (int) $roll['id'],
+						'cashier_ready'  => $rollCashierReady,
 					];
 					for ($k = 1, $cnt = count($idx_list); $k < $cnt; $k++) {
 						$drop_idx[$idx_list[$k]] = true;
@@ -483,6 +509,12 @@ class Channel {
 				}
 			}
 			unset($b);
+		}
+
+		foreach ($buckets as $bk => $bv) {
+			if (empty($bv['networks'])) {
+				unset($buckets[$bk]);
+			}
 		}
 
 		foreach ($buckets as &$b) {
@@ -542,18 +574,19 @@ class Channel {
 	 * @param float|int $money
 	 * @return array|false
 	 */
-	static public function submitByRoll($rollid, $uid = 0, $gid = 0, $money = 0)
+	static public function submitByRoll($rollid, $uid = 0, $gid = 0, $money = 0, $cashierFront = false)
 	{
 		global $DB;
 		$rollid = (int) $rollid;
 		$row = $DB->getRow("SELECT * FROM pre_roll WHERE id='{$rollid}' AND category=1 AND status=1 LIMIT 1");
 		if (!$row) return false;
 
-		$channelid = self::getChannelFromRoll($row['id'], $money);
+		$channelid = self::getChannelFromRoll($row['id'], $money, (bool)$cashierFront, true);
 		if (!$channelid) return false;
 
-		$ch = $DB->getRow("SELECT id,type,plugin,rate,apptype,mode,paymin,paymax,timestart,timestop FROM pre_channel WHERE id='{$channelid}' LIMIT 1");
+		$ch = $DB->getRow("SELECT id,type,plugin,rate,apptype,mode,paymin,paymax,timestart,timestop,cashier_ok FROM pre_channel WHERE id='{$channelid}' LIMIT 1");
 		if (!$ch) return false;
+		if ($cashierFront && isset($ch['cashier_ok']) && (int) $ch['cashier_ok'] === 0) return false;
 
 		$typeid = (int) $ch['type'];
 		$paytype = $DB->getRow("SELECT id,name,status FROM pre_type WHERE id='{$typeid}' LIMIT 1");
@@ -585,54 +618,115 @@ class Channel {
 		];
 	}
 
-	//根据轮询组ID获取支付通道ID
-	static private function getChannelFromRoll($channel, $money){
+	/**
+	 * 轮询组在金额/时段/限额（及可选 cashier_ok）过滤后的可参与成员，不修改轮询游标。
+	 *
+	 * @return array{newinfo:array,newids:int[],row:array}|null
+	 */
+	static public function rollViablePoolForRollId($rollId, $money, $cashierFront = false)
+	{
 		global $DB;
-		$row=$DB->getRow("SELECT * FROM pre_roll WHERE id='$channel' LIMIT 1");
-		if($row['status']==1){
-			$info = self::rollinfo_decode($row['info'],true);
+		$row = $DB->getRow("SELECT * FROM pre_roll WHERE id='" . (int) $rollId . "' LIMIT 1");
+		if (!$row) {
+			return null;
+		}
 
-			//先根据支付金额与限额过滤可用支付通道
-			$channelids = [];
-			foreach($info as $inforow){
-				$channelids[] = $inforow['name'];
+		return self::rollBuildViablePool($row, $money, (bool) $cashierFront);
+	}
+
+	/**
+	 * @return array{newinfo:array,newids:int[],row:array}|null
+	 */
+	static private function rollBuildViablePool($row, $money, $cashierFront = false)
+	{
+		global $DB;
+		if ((int) $row['status'] !== 1) {
+			return null;
+		}
+		$info = self::rollinfo_decode($row['info'], true);
+		if (empty($info)) {
+			return null;
+		}
+		$channelids = [];
+		foreach ($info as $inforow) {
+			$channelids[] = (int) $inforow['name'];
+		}
+		$channelids = array_filter(array_unique($channelids));
+		if (count($channelids) === 0) {
+			return null;
+		}
+		$idsStr = implode(',', $channelids);
+		$cs = $cashierFront ? ' AND cashier_ok=1' : '';
+		$rows = $DB->getAll("SELECT id,paymin,paymax,timestart,timestop FROM pre_channel WHERE id IN ($idsStr) AND status=1 AND daystatus=0{$cs}");
+		$newids = [];
+		foreach ($rows as $channelrow) {
+			if ($money > 0 && !empty($channelrow['paymin']) && $channelrow['paymin'] > 0 && $money < $channelrow['paymin']) {
+				continue;
 			}
-			$channelids = implode(',',$channelids);
-			$rows=$DB->getAll("SELECT id,paymin,paymax,timestart,timestop FROM pre_channel WHERE id IN ($channelids) AND status=1 AND daystatus=0");
-			$newids = [];
-			foreach($rows as $channelrow){
-				if($money>0 && !empty($channelrow['paymin']) && $channelrow['paymin']>0 && $money<$channelrow['paymin'])continue;
-				if($money>0 && !empty($channelrow['paymax']) && $channelrow['paymax']>0 && $money>$channelrow['paymax'])continue;
-				if(!isNullOrEmpty($channelrow['timestart']) && !isNullOrEmpty($channelrow['timestop']) && ($channelrow['timestart']>0 || $channelrow['timestop']>0)){
-					$hour = date('H');
-					if($channelrow['timestart'] < $channelrow['timestop']){
-						if($hour < $channelrow['timestart'] || $hour > $channelrow['timestop']) continue;
-					}else{
-						if($hour < $channelrow['timestart'] && $hour > $channelrow['timestop']) continue;
+			if ($money > 0 && !empty($channelrow['paymax']) && $channelrow['paymax'] > 0 && $money > $channelrow['paymax']) {
+				continue;
+			}
+			if (!isNullOrEmpty($channelrow['timestart']) && !isNullOrEmpty($channelrow['timestop']) && ($channelrow['timestart'] > 0 || $channelrow['timestop'] > 0)) {
+				$hour = date('H');
+				if ($channelrow['timestart'] < $channelrow['timestop']) {
+					if ($hour < $channelrow['timestart'] || $hour > $channelrow['timestop']) {
+						continue;
+					}
+				} else {
+					if ($hour < $channelrow['timestart'] && $hour > $channelrow['timestop']) {
+						continue;
 					}
 				}
-				$newids[] = $channelrow['id'];
 			}
-			if(count($newids)==0)return false;
-			
-			$newinfo = [];
-			foreach($info as $inforow){
-				if(in_array($inforow['name'], $newids))$newinfo[]=$inforow;
+			$newids[] = (int) $channelrow['id'];
+		}
+		if (count($newids) === 0) {
+			return null;
+		}
+		$newinfo = [];
+		foreach ($info as $inforow) {
+			if (in_array((int) $inforow['name'], $newids, true)) {
+				$newinfo[] = $inforow;
 			}
+		}
+		if (count($newinfo) === 0) {
+			return null;
+		}
 
-			if($row['kind']==2){
-				return $newids[0];
-			}elseif($row['kind']==1){
-				$channel = self::random_weight($newinfo);
-			}else{
-				$index = $row['index'] % count($newinfo);
-				$channel = $newinfo[$index]['name'];
+		return ['newinfo' => $newinfo, 'newids' => $newids, 'row' => $row];
+	}
+
+	//根据轮询组ID获取支付通道ID（$advanceIndex=false 时不推进顺序轮询下标，供预览逻辑使用）
+	static private function getChannelFromRoll($channel, $money, $cashierFront = false, $advanceIndex = true){
+		global $DB;
+		$row=$DB->getRow("SELECT * FROM pre_roll WHERE id='$channel' LIMIT 1");
+		if(!$row || (int)$row['status'] !== 1){
+			return false;
+		}
+		$pool = self::rollBuildViablePool($row, $money, (bool)$cashierFront);
+		if($pool === null){
+			return false;
+		}
+		$newinfo = $pool['newinfo'];
+		$newids = $pool['newids'];
+		$row = $pool['row'];
+
+		if($row['kind']==2){
+			return $newids[0];
+		}elseif($row['kind']==1){
+			$channel = self::random_weight($newinfo);
+			if(!$channel){
+				return false;
+			}
+		}else{
+			$index = $row['index'] % count($newinfo);
+			$channel = $newinfo[$index]['name'];
+			if($advanceIndex){
 				$index = ($row['index'] + 1) % count($newinfo);
 				$DB->exec("UPDATE pre_roll SET `index`='$index' WHERE id='{$row['id']}'");
 			}
-			return $channel;
 		}
-		return false;
+		return $channel;
 	}
 
 	//解析轮询组info

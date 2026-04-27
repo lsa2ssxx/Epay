@@ -138,6 +138,7 @@ CREATE TABLE `pre_channel` (
   `daymaxorder` int(10) DEFAULT 0,
   `timestart` int(11) DEFAULT NULL,
   `timestop` int(11) DEFAULT NULL,
+  `cashier_ok` tinyint(1) NOT NULL DEFAULT 1,
  PRIMARY KEY (`id`),
  KEY `type` (`type`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;

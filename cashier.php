@@ -37,8 +37,13 @@ if ($cm_is_expired) {
 	exit;
 }
 
-/* ---------- 三级菜单数据 ---------- */
-$cm_categories = \lib\Channel::getCategorizedTypes($row['uid'], $gid);
+/* ---------- 三级菜单数据（结合订单金额探测真实通道池；无数据库副作用） ---------- */
+$cm_order_money = isset($row['money']) ? (float) $row['money'] : 0;
+$cm_categories = \lib\Channel::getCategorizedTypes($row['uid'], $gid, $cm_order_money);
+$cm_cashier_qs = '&cashier=1';
+if ($sitename) {
+	$cm_cashier_qs .= '&sitename=' . urlencode(base64_encode($sitename));
+}
 
 /**
  * 单网络快通道：直接生成 submit2.php 链接
@@ -94,7 +99,7 @@ function cm_currency_icon_html($cat)
 /**
  * 渲染一级（币种）条目
  */
-function cm_render_currency_item($cat, $trade_no, $self, $qs_base)
+function cm_render_currency_item($cat, $trade_no, $self, $qs_base, $cashier_qs)
 {
 	$key = $cat['key'];
 	$name = $cat['name'];
@@ -103,15 +108,20 @@ function cm_render_currency_item($cat, $trade_no, $self, $qs_base)
 
 	if ($count === 1) {
 		$only = $cat['networks'][0];
+		$ready = !isset($only['cashier_ready']) || $only['cashier_ready'];
 		if (!empty($only['is_roll']) && !empty($only['roll_id'])) {
-			$href = './submit2.php?rollid=' . (int) $only['roll_id'] . '&trade_no=' . urlencode((string) $trade_no);
+			$href = './submit2.php?rollid=' . (int) $only['roll_id'] . '&trade_no=' . urlencode((string) $trade_no) . $cashier_qs;
 		} else {
-			$href = './submit2.php?typeid=' . (int) $only['typeid'] . '&trade_no=' . urlencode((string) $trade_no);
+			$href = './submit2.php?typeid=' . (int) $only['typeid'] . '&trade_no=' . urlencode((string) $trade_no) . $cashier_qs;
+		}
+		if (!$ready) {
+			$href = '';
 		}
 		$tag_h = htmlspecialchars($only['network_label'] !== '' ? $only['network_label'] : ($kind === 'fiat' ? 'Instant' : ''), ENT_QUOTES, 'UTF-8');
 	} else {
 		$href = $self . '?' . $qs_base . '&currency=' . urlencode($key);
 		$tag_h = htmlspecialchars($count . ' networks', ENT_QUOTES, 'UTF-8');
+		$ready = true;
 	}
 
 	$icon_html = cm_currency_icon_html($cat);
@@ -124,7 +134,14 @@ function cm_render_currency_item($cat, $trade_no, $self, $qs_base)
 	}
 	$search_h = htmlspecialchars($search, ENT_QUOTES, 'UTF-8');
 
-	$html = '<a class="cm-item" href="' . $href_h . '" data-search="' . $search_h . '">';
+	$wrap = ($ready && $href !== '') ? 'a' : 'div';
+	$cls = 'cm-item' . (($wrap === 'div' && $count === 1 && !$ready) ? ' cm-item-disabled' : '');
+	$open = '<' . $wrap . ' class="' . $cls . '"';
+	if ($wrap === 'a') {
+		$open .= ' href="' . $href_h . '"';
+	}
+	$open .= ' data-search="' . $search_h . '">';
+	$html = $open;
 	$html .= '<span class="cm-item-icon">' . $icon_html . '</span>';
 	$html .= '<div class="cm-item-body">';
 	$html .= '<div class="cm-item-title"><span class="cm-item-code">' . $short_h . '</span><span class="cm-item-name">' . $name_h . '</span></div>';
@@ -132,8 +149,12 @@ function cm_render_currency_item($cat, $trade_no, $self, $qs_base)
 	if ($tag_h !== '') {
 		$html .= '<span class="cm-item-tag">' . $tag_h . '</span>';
 	}
-	$html .= cm_chev_svg();
-	$html .= '</a>';
+	if ($wrap === 'a') {
+		$html .= cm_chev_svg();
+	} elseif ($count === 1 && !$ready) {
+		$html .= '<span class="cm-item-muted">暂不可下单</span>';
+	}
+	$html .= '</' . $wrap . '>';
 
 	return $html;
 }
@@ -141,13 +162,14 @@ function cm_render_currency_item($cat, $trade_no, $self, $qs_base)
 /**
  * 渲染二级（网络）条目
  */
-function cm_render_network_item($net, $trade_no)
+function cm_render_network_item($net, $trade_no, $cashier_qs)
 {
 	$icon_html = pay_type_icon_html($net['name'], 'cm-icon-img');
 	$showname = $net['showname'] ?: $net['name'];
 	$short = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', (string) $net['name']));
 	if (strlen($short) > 6) $short = substr($short, 0, 6);
 	$tag = $net['network_label'] !== '' ? $net['network_label'] : '';
+	$ready = !isset($net['cashier_ready']) || $net['cashier_ready'];
 
 	$showname_h = htmlspecialchars((string) $showname, ENT_QUOTES, 'UTF-8');
 	$short_h = htmlspecialchars((string) $short, ENT_QUOTES, 'UTF-8');
@@ -155,13 +177,20 @@ function cm_render_network_item($net, $trade_no)
 	$search = strtolower($net['name'] . ' ' . $showname . ' ' . $tag);
 	$search_h = htmlspecialchars($search, ENT_QUOTES, 'UTF-8');
 	if (!empty($net['is_roll']) && !empty($net['roll_id'])) {
-		$href = './submit2.php?rollid=' . (int) $net['roll_id'] . '&trade_no=' . urlencode((string) $trade_no);
+		$href = './submit2.php?rollid=' . (int) $net['roll_id'] . '&trade_no=' . urlencode((string) $trade_no) . $cashier_qs;
 	} else {
-		$href = './submit2.php?typeid=' . (int) $net['typeid'] . '&trade_no=' . urlencode((string) $trade_no);
+		$href = './submit2.php?typeid=' . (int) $net['typeid'] . '&trade_no=' . urlencode((string) $trade_no) . $cashier_qs;
 	}
 	$href_h = htmlspecialchars($href, ENT_QUOTES, 'UTF-8');
 
-	$html = '<a class="cm-item" href="' . $href_h . '" data-search="' . $search_h . '">';
+	$wrap = $ready ? 'a' : 'div';
+	$cls = 'cm-item' . ($ready ? '' : ' cm-item-disabled');
+	$open = '<' . $wrap . ' class="' . $cls . '"';
+	if ($wrap === 'a') {
+		$open .= ' href="' . $href_h . '"';
+	}
+	$open .= ' data-search="' . $search_h . '">';
+	$html = $open;
 	$html .= '<span class="cm-item-icon">' . $icon_html . '</span>';
 	$html .= '<div class="cm-item-body">';
 	$html .= '<div class="cm-item-title"><span class="cm-item-code">' . $short_h . '</span><span class="cm-item-name">' . $showname_h . '</span></div>';
@@ -169,8 +198,12 @@ function cm_render_network_item($net, $trade_no)
 	if ($tag_h !== '') {
 		$html .= '<span class="cm-item-tag">' . $tag_h . '</span>';
 	}
-	$html .= cm_chev_svg();
-	$html .= '</a>';
+	if ($ready) {
+		$html .= cm_chev_svg();
+	} else {
+		$html .= '<span class="cm-item-muted">暂不可下单</span>';
+	}
+	$html .= '</' . $wrap . '>';
 
 	return $html;
 }
@@ -187,12 +220,15 @@ if ($cm_currency_param !== '') {
 	// 二级若只有 1 个网络，直接 302 进入支付通道
 	if ($cm_active_cat && count($cm_active_cat['networks']) === 1) {
 		$only = $cm_active_cat['networks'][0];
-		if (!empty($only['is_roll']) && !empty($only['roll_id'])) {
-			header('Location: ./submit2.php?rollid=' . (int) $only['roll_id'] . '&trade_no=' . urlencode($trade_no), true, 302);
-		} else {
-			header('Location: ./submit2.php?typeid=' . (int) $only['typeid'] . '&trade_no=' . urlencode($trade_no), true, 302);
+		$onlyReady = !isset($only['cashier_ready']) || $only['cashier_ready'];
+		if ($onlyReady) {
+			if (!empty($only['is_roll']) && !empty($only['roll_id'])) {
+				header('Location: ./submit2.php?rollid=' . (int) $only['roll_id'] . '&trade_no=' . urlencode($trade_no) . $cm_cashier_qs, true, 302);
+			} else {
+				header('Location: ./submit2.php?typeid=' . (int) $only['typeid'] . '&trade_no=' . urlencode($trade_no) . $cm_cashier_qs, true, 302);
+			}
+			exit;
 		}
-		exit;
 	}
 }
 
@@ -215,7 +251,7 @@ $cm_back_url = $cm_self . '?' . $cm_qs_base;
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0">
 <title><?php echo $cm_active_cat ? 'Select Network' : 'Select Currency'; ?> | <?php echo htmlspecialchars((string) $cm_site_name, ENT_QUOTES, 'UTF-8'); ?></title>
-<link href="/assets/css/cashier-modern.css?v=3" rel="stylesheet" type="text/css">
+<link href="/assets/css/cashier-modern.css?v=4" rel="stylesheet" type="text/css">
 <link href="/assets/css/pay-type-icon.css" rel="stylesheet" type="text/css">
 </head>
 <body class="cm-page">
@@ -251,8 +287,28 @@ $cm_back_url = $cm_self . '?' . $cm_qs_base;
 		</div>
 
 		<div class="cm-list" id="cm-list">
-			<?php foreach ($cm_active_cat['networks'] as $n) {
-				echo cm_render_network_item($n, $trade_no);
+			<?php
+			$cm_net_avail = [];
+			$cm_net_unavail = [];
+			foreach ($cm_active_cat['networks'] as $n) {
+				$cm_nr = !array_key_exists('cashier_ready', $n) || $n['cashier_ready'];
+				if ($cm_nr) {
+					$cm_net_avail[] = $n;
+				} else {
+					$cm_net_unavail[] = $n;
+				}
+			}
+			if (count($cm_net_avail) > 0) { ?>
+				<div class="cm-section-label">可用</div>
+				<?php foreach ($cm_net_avail as $n) {
+					echo cm_render_network_item($n, $trade_no, $cm_cashier_qs);
+				}
+			}
+			if (count($cm_net_unavail) > 0) { ?>
+				<div class="cm-section-label cm-section-label-muted">不可用</div>
+				<?php foreach ($cm_net_unavail as $n) {
+					echo cm_render_network_item($n, $trade_no, $cm_cashier_qs);
+				}
 			} ?>
 			<div class="cm-empty" id="cm-empty">没有匹配的网络</div>
 		</div>
@@ -278,17 +334,17 @@ $cm_back_url = $cm_self . '?' . $cm_qs_base;
 
 			<?php if (count($cm_crypto) > 0) { ?>
 				<div class="cm-group-title">Crypto</div>
-				<?php foreach ($cm_crypto as $c) { echo cm_render_currency_item($c, $trade_no, $cm_self, $cm_qs_base); } ?>
+				<?php foreach ($cm_crypto as $c) { echo cm_render_currency_item($c, $trade_no, $cm_self, $cm_qs_base, $cm_cashier_qs); } ?>
 			<?php } ?>
 
 			<?php if (count($cm_fiat) > 0) { ?>
 				<div class="cm-group-title">Fiat</div>
-				<?php foreach ($cm_fiat as $c) { echo cm_render_currency_item($c, $trade_no, $cm_self, $cm_qs_base); } ?>
+				<?php foreach ($cm_fiat as $c) { echo cm_render_currency_item($c, $trade_no, $cm_self, $cm_qs_base, $cm_cashier_qs); } ?>
 			<?php } ?>
 
 			<?php if (count($cm_other) > 0) { ?>
 				<div class="cm-group-title">Others</div>
-				<?php foreach ($cm_other as $c) { echo cm_render_currency_item($c, $trade_no, $cm_self, $cm_qs_base); } ?>
+				<?php foreach ($cm_other as $c) { echo cm_render_currency_item($c, $trade_no, $cm_self, $cm_qs_base, $cm_cashier_qs); } ?>
 			<?php } ?>
 
 			<?php if (count($cm_categories) === 0) { ?>
@@ -333,5 +389,5 @@ window.CM_CONFIG = {
 	expireAt: <?php echo (int) $cm_expire_ts; ?>
 };
 </script>
-<script src="/assets/js/cashier-modern.js?v=3"></script>
+<script src="/assets/js/cashier-modern.js?v=4"></script>
 </body></html>

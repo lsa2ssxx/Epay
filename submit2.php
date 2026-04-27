@@ -8,6 +8,7 @@ $submit2=true;
 
 $typeid=intval($_GET['typeid']);
 $rollid=isset($_GET['rollid']) ? intval($_GET['rollid']) : 0;
+$cashier_front = isset($_GET['cashier']) && $_GET['cashier'] === '1';
 $trade_no=daddslashes($_GET['trade_no']);
 $order=$DB->getRow("SELECT * FROM pre_order WHERE trade_no='{$trade_no}' LIMIT 1");
 if(!$order)sysmsg('该订单号不存在，请返回来源地重新发起请求！');
@@ -47,13 +48,13 @@ $conf = array_merge($conf, $groupconfig);
 
 if($firstGetChannel){
 	if($rollid > 0){
-		$submitData = \lib\Channel::submitByRoll($rollid, $userrow['uid'], $userrow['gid'], $order['money']);
+		$submitData = \lib\Channel::submitByRoll($rollid, $userrow['uid'], $userrow['gid'], $order['money'], $cashier_front);
 		if(!$submitData){
 			sysmsg('<center>当前轮询组无可用通道</center>', '跳转提示');
 		}
 		$typeid = $submitData['typeid'];
 	}else{
-		$submitData = \lib\Channel::submit2($typeid, $userrow['uid'], $userrow['gid'], $order['money']);
+		$submitData = \lib\Channel::submit2($typeid, $userrow['uid'], $userrow['gid'], $order['money'], $cashier_front);
 		if(!$submitData){
 			sysmsg('<center>当前支付方式无法使用</center>', '跳转提示');
 		}

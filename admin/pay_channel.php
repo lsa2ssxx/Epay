@@ -125,6 +125,15 @@ unset($rs);
 							<input type="text" class="form-control" name="timestop" id="timestop" placeholder="结束时间0~23小时" title="">
 						</div>
 					</div>
+					<div class="form-group">
+						<label class="col-sm-2 control-label">收银台</label>
+						<div class="col-sm-10">
+							<select name="cashier_ok" id="cashier_ok" class="form-control">
+								<option value="1">可用（顾客可从收银台入口下单）</option>
+								<option value="0">不可用（收银台仅展示为不可用；API/轮询等未带收银台参数时仍可选中）</option>
+							</select>
+						</div>
+					</div>
 				</form>
 			</div>
 			<div class="modal-footer">
@@ -153,6 +162,9 @@ unset($rs);
   </div>
   <div class="form-group">
 	<select name="dstatus" class="form-control"><option value="-1">全部状态</option><option value="1">状态已开启</option><option value="0">状态已关闭</option></select>
+  </div>
+  <div class="form-group">
+	<select name="cash_filter" class="form-control"><option value="-1">收银台全部</option><option value="1">收银台可用</option><option value="0">收银台不可用</option></select>
   </div>
   <button type="submit" class="btn btn-primary"><i class="fa fa-search"></i> 搜索</button>
   <a href="javascript:searchClear()" class="btn btn-default"><i class="fa fa-refresh"></i> 重置</a>
@@ -205,6 +217,16 @@ function getChannelTableColumns() {
 		{
 			field: 'rate',
 			title: '分成比例'
+		},
+		{
+			field: 'cashier_ok',
+			title: '收银台',
+			formatter: function(value, row, index) {
+				if(value == '0' || value === 0){
+					return '<span class="label label-warning">不可用</span>';
+				}
+				return '<span class="label label-success">可用</span>';
+			}
 		},
 		{
 			field: 'type',
@@ -404,6 +426,7 @@ function addframe(){
 	$("#plugin").empty();
 	$("#timestart").val('');
 	$("#timestop").val('');
+	$("#cashier_ok").val('1');
 }
 function editframe(id){
 	var ii = layer.load(2, {shade:[0.1,'#fff']});
@@ -429,6 +452,7 @@ function editframe(id){
 				$("#mode").val(data.data.mode);
 				$("#timestart").val(data.data.timestart);
 				$("#timestop").val(data.data.timestop);
+				$("#cashier_ok").val((data.data.cashier_ok === 0 || data.data.cashier_ok === '0') ? '0' : '1');
 				changeType(data.data.plugin);
 				changeMode()
 			}else{
@@ -465,6 +489,7 @@ function copyframe(id){
 				$("#mode").val(data.data.mode);
 				$("#timestart").val(data.data.timestart);
 				$("#timestop").val(data.data.timestop);
+				$("#cashier_ok").val((data.data.cashier_ok === 0 || data.data.cashier_ok === '0') ? '0' : '1');
 				changeType(data.data.plugin);
 				changeMode()
 			}else{

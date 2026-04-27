@@ -26,6 +26,11 @@ case 'channelList':
 		$dstatus = intval($_POST['dstatus']);
 		$sql.=" AND A.`status`={$dstatus}";
 	}
+	if(isset($_POST['cash_filter']) && $_POST['cash_filter'] !== '' && $_POST['cash_filter'] > -1) {
+		$cf = intval($_POST['cash_filter']);
+		$cf = $cf === 0 ? 0 : 1;
+		$sql.=" AND A.`cashier_ok`={$cf}";
+	}
 	if(isset($_POST['kw']) && !empty($_POST['kw'])) {
 		$kw = trim(daddslashes($_POST['kw']));
 		$sql.=" AND (A.`id`='{$kw}' OR A.`name` like '%{$kw}%')";
@@ -279,6 +284,7 @@ case 'importBepusdtChannels':
 			'timestop' => $timestop === '' ? null : intval($timestop),
 			'config' => json_encode($cfg, JSON_UNESCAPED_UNICODE),
 			'status' => 0,
+			'cashier_ok' => 1,
 		];
 		if($DB->insert('channel', $data)){
 			$imported++;
@@ -430,10 +436,12 @@ case 'saveChannel':
 		if($paymax && !preg_match('/^[0-9.]+$/',$paymax)){
 			exit('{"code":-1,"msg":"最大支付金额不符合规则"}');
 		}
+		$cashier_ok = isset($_POST['cashier_ok']) ? intval($_POST['cashier_ok']) : 1;
+		if($cashier_ok !== 0) $cashier_ok = 1;
 		$row=$DB->getRow("SELECT * FROM pre_channel WHERE name='$name' LIMIT 1");
 		if($row)
 			exit('{"code":-1,"msg":"支付通道名称重复"}');
-		$data = ['name'=>$name, 'rate'=>$rate, 'costrate'=>$costrate, 'mode'=>$mode, 'type'=>$type, 'plugin'=>$plugin, 'daytop'=>$daytop, 'paymin'=>$paymin, 'paymax'=>$paymax, 'daymaxorder'=>$daymaxorder, 'timestart'=>$timestart, 'timestop'=>$timestop];
+		$data = ['name'=>$name, 'rate'=>$rate, 'costrate'=>$costrate, 'mode'=>$mode, 'type'=>$type, 'plugin'=>$plugin, 'daytop'=>$daytop, 'paymin'=>$paymin, 'paymax'=>$paymax, 'daymaxorder'=>$daymaxorder, 'timestart'=>$timestart, 'timestop'=>$timestop, 'cashier_ok'=>$cashier_ok];
 		if($DB->insert('channel', $data))exit('{"code":0,"msg":"新增支付通道成功！"}');
 		else exit('{"code":-1,"msg":"新增支付通道失败['.$DB->error().']"}');
 	}elseif($_POST['action'] == 'copy'){
@@ -464,10 +472,12 @@ case 'saveChannel':
 		if($paymax && !preg_match('/^[0-9.]+$/',$paymax)){
 			exit('{"code":-1,"msg":"最大支付金额不符合规则"}');
 		}
+		$cashier_ok = isset($_POST['cashier_ok']) ? intval($_POST['cashier_ok']) : 1;
+		if($cashier_ok !== 0) $cashier_ok = 1;
 		$nrow=$DB->getRow("SELECT * FROM pre_channel WHERE name='$name' LIMIT 1");
 		if($nrow)
 			exit('{"code":-1,"msg":"支付通道名称重复"}');
-		$data = ['name'=>$name, 'rate'=>$rate, 'costrate'=>$costrate, 'mode'=>$mode, 'type'=>$type, 'plugin'=>$plugin, 'daytop'=>$daytop, 'paymin'=>$paymin, 'paymax'=>$paymax, 'daymaxorder'=>$daymaxorder, 'config'=>$row['config'], 'apptype'=>$row['apptype'], 'appwxmp'=>$row['appwxmp'], 'appwxa'=>$row['appwxa'], 'timestart'=>$timestart, 'timestop'=>$timestop];
+		$data = ['name'=>$name, 'rate'=>$rate, 'costrate'=>$costrate, 'mode'=>$mode, 'type'=>$type, 'plugin'=>$plugin, 'daytop'=>$daytop, 'paymin'=>$paymin, 'paymax'=>$paymax, 'daymaxorder'=>$daymaxorder, 'config'=>$row['config'], 'apptype'=>$row['apptype'], 'appwxmp'=>$row['appwxmp'], 'appwxa'=>$row['appwxa'], 'timestart'=>$timestart, 'timestop'=>$timestop, 'cashier_ok'=>$cashier_ok];
 		if($DB->insert('channel', $data))exit('{"code":0,"msg":"复制支付通道成功！"}');
 		else exit('{"code":-1,"msg":"复制支付通道失败['.$DB->error().']"}');
 	}elseif($_POST['action'] == 'edit'){
@@ -498,10 +508,12 @@ case 'saveChannel':
 		if($paymax && !preg_match('/^[0-9.]+$/',$paymax)){
 			exit('{"code":-1,"msg":"最大支付金额不符合规则"}');
 		}
+		$cashier_ok = isset($_POST['cashier_ok']) ? intval($_POST['cashier_ok']) : 1;
+		if($cashier_ok !== 0) $cashier_ok = 1;
 		$nrow=$DB->getRow("SELECT * FROM pre_channel WHERE name='$name' AND id<>$id LIMIT 1");
 		if($nrow)
 			exit('{"code":-1,"msg":"支付通道名称重复"}');
-		$data = ['name'=>$name, 'rate'=>$rate, 'costrate'=>$costrate, 'mode'=>$mode, 'type'=>$type, 'plugin'=>$plugin, 'daytop'=>$daytop, 'paymin'=>$paymin, 'paymax'=>$paymax, 'daymaxorder'=>$daymaxorder, 'timestart'=>$timestart, 'timestop'=>$timestop];
+		$data = ['name'=>$name, 'rate'=>$rate, 'costrate'=>$costrate, 'mode'=>$mode, 'type'=>$type, 'plugin'=>$plugin, 'daytop'=>$daytop, 'paymin'=>$paymin, 'paymax'=>$paymax, 'daymaxorder'=>$daymaxorder, 'timestart'=>$timestart, 'timestop'=>$timestop, 'cashier_ok'=>$cashier_ok];
 		if($DB->update('channel', $data, ['id'=>$id])!==false){
 			if($row['daystatus']==1 && ($daytop==0 || $daytop>$row['daytop'] || $daymaxorder==0)){
 				$DB->exec("UPDATE pre_channel SET daystatus=0 WHERE id='$id'");

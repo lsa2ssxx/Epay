@@ -217,6 +217,9 @@ $truncate = function (string $s, int $head = 5, int $tail = 5): string {
 		<div class="cm-ps-actions">
 			<a id="cm-ps-back" class="cm-btn cm-btn-secondary" href="javascript:void(0);"><?php echo $h($cm_btn); ?></a>
 		</div>
+		<?php if ($state === 'completed') { ?>
+		<p class="cm-ps-desc cm-ps-desc-dim" id="cm-ps-auto-hint" style="margin-top:12px;font-size:13px;text-align:center;">即将自动返回商户网站，您也可主动点击上方按钮</p>
+		<?php } ?>
 	</div>
 
 </div>
@@ -285,20 +288,40 @@ window.CM_PAYSUCCESS = {
 		setTimeout(function(){ t.classList.remove('is-show'); }, 1400);
 	}
 
-	// 「返回商家」：调用 getshop.php 获取 backurl（兼容超时失效场景）
+	// 「返回商家」与自动回跳：均通过 getshop 取 backurl（与历史「支付成功直跳」一致，兼容超时 payok 等场景）
 	var backBtn = document.getElementById('cm-ps-back');
-	if (backBtn) {
-		backBtn.addEventListener('click', function(){
-			backBtn.classList.add('is-loading');
-			fetchBackUrl(function(backurl){
-				if (backurl) {
-					window.location.href = backurl;
-				} else {
-					backBtn.classList.remove('is-loading');
-					showToast('当前无法返回，请稍后重试');
-				}
-			});
+	var autoReturnTimer = null;
+	var AUTO_MERCHANT_MS = 2800;
+
+	function goToMerchant(showLoading) {
+		if (showLoading && backBtn) backBtn.classList.add('is-loading');
+		fetchBackUrl(function (backurl) {
+			if (backurl) {
+				window.location.href = backurl;
+			} else {
+				if (backBtn) backBtn.classList.remove('is-loading');
+				showToast('当前无法返回，请稍后重试');
+			}
 		});
+	}
+	if (backBtn) {
+		backBtn.addEventListener('click', function () {
+			if (autoReturnTimer) {
+				clearTimeout(autoReturnTimer);
+				autoReturnTimer = null;
+			}
+			var hint = document.getElementById('cm-ps-auto-hint');
+			if (hint) hint.style.display = 'none';
+			goToMerchant(true);
+		});
+	}
+	if (currentState === 'completed' && backBtn) {
+		autoReturnTimer = setTimeout(function () {
+			autoReturnTimer = null;
+			var hint = document.getElementById('cm-ps-auto-hint');
+			if (hint) hint.style.display = 'none';
+			goToMerchant(true);
+		}, AUTO_MERCHANT_MS);
 	}
 
 	function fetchBackUrl(cb){
