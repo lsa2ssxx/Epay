@@ -71,7 +71,8 @@ $list = $DB->getAll("SELECT * FROM pre_roll ORDER BY id ASC");
 					<div class="form-group hide" id="grp_network">
 						<label class="col-sm-2 control-label">网络</label>
 						<div class="col-sm-10">
-							<input type="text" class="form-control" name="network" id="network" placeholder="如 TRC20 / ERC20 / Polygon，与支付方式中网络字段保持一致" maxlength="30">
+							<input type="text" class="form-control" name="network" id="network" placeholder="如 TRC20 / ERC20 / Polygon；TRX/ETH/BTC 等原生币留空" maxlength="30">
+							<p class="help-block" style="margin:4px 0 0;">稳定币（USDT/USDC...）必须填写网络；TRX/ETH/BTC 等原生币此处留空，将合并所有同币种通道一起轮询。</p>
 						</div>
 					</div>
 					<div class="form-group">
@@ -208,8 +209,8 @@ function save(){
 		layer.alert('请确保各项不能为空！');return false;
 	}
 	if($("#category").val() == '1'){
-		if($("#currency").val()==''||$("#network").val()==''){
-			layer.alert('请填写币种与网络！');return false;
+		if($("#currency").val()==''){
+			layer.alert('请填写币种！');return false;
 		}
 	}else{
 		if($("#type").val()==0){

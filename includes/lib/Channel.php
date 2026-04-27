@@ -511,8 +511,10 @@ class Channel {
 	/**
 	 * 已启用的「按加密货币」轮询组（pre_roll.category=1），按 currency/network 索引。
 	 * 仅返回当前确实有可用通道的轮询组（避免在前台展示空入口）。
+	 * 原生币（如 TRX/ETH/BTC，pre_type.network 为空）允许轮询组的 network 留空，
+	 * 此时以空字符串作为内层 key 与 getCategorizedTypes 的合并逻辑保持一致。
 	 *
-	 * @return array<string,array<string,array{id:int,kind:int}>>  形如 ['USDT'=>['TRC20'=>['id'=>3,'kind'=>0], ...], ...]
+	 * @return array<string,array<string,array{id:int,kind:int}>>  形如 ['USDT'=>['TRC20'=>['id'=>3,'kind'=>0], ...], 'TRX'=>['' => ['id'=>4,'kind'=>1]]]
 	 */
 	static public function getCryptoRolls()
 	{
@@ -523,7 +525,7 @@ class Channel {
 		foreach ($rows as $row) {
 			$cur = strtoupper(trim((string) $row['currency']));
 			$net = strtoupper(trim((string) $row['network']));
-			if ($cur === '' || $net === '') continue;
+			if ($cur === '') continue;
 			if (empty($row['info'])) continue;
 			$out[$cur][$net] = ['id' => (int) $row['id'], 'kind' => (int) $row['kind']];
 		}

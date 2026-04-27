@@ -638,11 +638,14 @@ case 'saveRoll':
 	$currency = isset($_POST['currency']) ? trim((string)$_POST['currency']) : '';
 	$network  = isset($_POST['network'])  ? trim((string)$_POST['network'])  : '';
 	if($category === 1){
-		if($currency === '' || $network === ''){
-			exit('{"code":-1,"msg":"按加密货币模式必须填写币种与网络"}');
+		if($currency === ''){
+			exit('{"code":-1,"msg":"按加密货币模式必须填写币种"}');
 		}
-		if(!preg_match('/^[A-Za-z0-9_\-]+$/', $currency) || !preg_match('/^[A-Za-z0-9_\-]+$/', $network)){
-			exit('{"code":-1,"msg":"币种/网络仅允许字母数字下划线和连字符"}');
+		if(!preg_match('/^[A-Za-z0-9_\-]+$/', $currency)){
+			exit('{"code":-1,"msg":"币种仅允许字母数字下划线和连字符"}');
+		}
+		if($network !== '' && !preg_match('/^[A-Za-z0-9_\-]+$/', $network)){
+			exit('{"code":-1,"msg":"网络仅允许字母数字下划线和连字符"}');
 		}
 		if(strlen($currency) > 30 || strlen($network) > 30){
 			exit('{"code":-1,"msg":"币种/网络长度不能超过 30"}');
@@ -720,9 +723,15 @@ case 'rollInfo':
 	if($category === 1){
 		$cur = trim((string)($row['currency'] ?? ''));
 		$net = trim((string)($row['network'] ?? ''));
-		if($cur === '' || $net === '') exit('{"code":-1,"msg":"加密货币轮询组缺少币种或网络"}');
-		$list=$DB->getAll("SELECT A.id, CONCAT(A.name, ' [', B.showname, ']') AS name FROM pre_channel A INNER JOIN pre_type B ON A.type=B.id WHERE B.currency=:c AND B.network=:n {$statusSql} ORDER BY A.id ASC", [':c'=>$cur, ':n'=>$net]);
-		if(!$list)exit('{"code":-1,"msg":"没有找到币种='.$cur.' 网络='.$net.' 的支付通道，请先在支付方式中正确填写 currency/network"}');
+		if($cur === '') exit('{"code":-1,"msg":"加密货币轮询组缺少币种"}');
+		if($net === ''){
+			// 原生币（如 TRX/ETH/BTC）：pre_type.network 为空或 NULL
+			$list=$DB->getAll("SELECT A.id, CONCAT(A.name, ' [', B.showname, ']') AS name FROM pre_channel A INNER JOIN pre_type B ON A.type=B.id WHERE B.currency=:c AND (B.network IS NULL OR B.network='') {$statusSql} ORDER BY A.id ASC", [':c'=>$cur]);
+			if(!$list)exit('{"code":-1,"msg":"没有找到币种='.$cur.' 且网络为空的原生币支付通道，请先在支付方式中正确填写 currency 字段"}');
+		}else{
+			$list=$DB->getAll("SELECT A.id, CONCAT(A.name, ' [', B.showname, ']') AS name FROM pre_channel A INNER JOIN pre_type B ON A.type=B.id WHERE B.currency=:c AND B.network=:n {$statusSql} ORDER BY A.id ASC", [':c'=>$cur, ':n'=>$net]);
+			if(!$list)exit('{"code":-1,"msg":"没有找到币种='.$cur.' 网络='.$net.' 的支付通道，请先在支付方式中正确填写 currency/network"}');
+		}
 	}else{
 		$type = (int)$row['type'];
 		$list=$DB->getAll("SELECT A.id, A.name FROM pre_channel A WHERE A.type='{$type}' {$statusSql} ORDER BY A.id ASC");
