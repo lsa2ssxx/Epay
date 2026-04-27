@@ -166,8 +166,7 @@ function cm_render_network_item($net, $trade_no, $cashier_qs)
 {
 	$icon_html = pay_type_icon_html($net['name'], 'cm-icon-img');
 	$showname = $net['showname'] ?: $net['name'];
-	$short = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', (string) $net['name']));
-	if (strlen($short) > 6) $short = substr($short, 0, 6);
+	$short = '';
 	$tag = $net['network_label'] !== '' ? $net['network_label'] : '';
 	$ready = !isset($net['cashier_ready']) || $net['cashier_ready'];
 
