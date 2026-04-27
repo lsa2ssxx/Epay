@@ -721,17 +721,42 @@ case 'rollInfo':
 	if($row['kind'] < 2) $statusSql = " AND A.status=1 ";
 	$category = isset($row['category']) ? (int)$row['category'] : 0;
 	if($category === 1){
-		$cur = trim((string)($row['currency'] ?? ''));
-		$net = trim((string)($row['network'] ?? ''));
+		require_once SYSTEM_ROOT.'pay_type_category.php';
+		$cur = strtoupper(trim((string)($row['currency'] ?? '')));
+		$net = strtoupper(trim((string)($row['network'] ?? '')));
 		if($cur === '') exit('{"code":-1,"msg":"加密货币轮询组缺少币种"}');
-		if($net === ''){
-			// 原生币（如 TRX/ETH/BTC）：pre_type.network 为空或 NULL
-			$list=$DB->getAll("SELECT A.id, CONCAT(A.name, ' [', B.showname, ']') AS name FROM pre_channel A INNER JOIN pre_type B ON A.type=B.id WHERE B.currency=:c AND (B.network IS NULL OR B.network='') {$statusSql} ORDER BY A.id ASC", [':c'=>$cur]);
-			if(!$list)exit('{"code":-1,"msg":"没有找到币种='.$cur.' 且网络为空的原生币支付通道，请先在支付方式中正确填写 currency 字段"}');
-		}else{
-			$list=$DB->getAll("SELECT A.id, CONCAT(A.name, ' [', B.showname, ']') AS name FROM pre_channel A INNER JOIN pre_type B ON A.type=B.id WHERE B.currency=:c AND B.network=:n {$statusSql} ORDER BY A.id ASC", [':c'=>$cur, ':n'=>$net]);
-			if(!$list)exit('{"code":-1,"msg":"没有找到币种='.$cur.' 网络='.$net.' 的支付通道，请先在支付方式中正确填写 currency/network"}');
+		// 复用前台 pay_type_category_resolve()：DB 列空时按调用值启发式推导
+		$types = $DB->getAll("SELECT id,name,showname,currency,network FROM pre_type");
+		$matchedIds = [];
+		$matchedShowname = [];
+		foreach($types as $t){
+			$resolved = pay_type_category_resolve($t);
+			$tCur = strtoupper((string)$resolved['currency']);
+			$tNet = strtoupper((string)($resolved['network'] ?? ''));
+			if($tCur !== $cur) continue;
+			if($tNet !== $net) continue;
+			$matchedIds[] = (int)$t['id'];
+			$matchedShowname[(int)$t['id']] = (string)$t['showname'];
 		}
+		if(empty($matchedIds)){
+			$hint = $net === '' ? '原生币（网络为空）' : ('网络='.$net);
+			exit(json_encode(['code'=>-1,'msg'=>'没有找到币种='.$cur.' '.$hint.' 的支付方式，请先在「支付方式」中添加或正确填写 currency/network'], JSON_UNESCAPED_UNICODE));
+		}
+		$idIn = implode(',', $matchedIds);
+		$list = $DB->getAll("SELECT A.id, A.name, A.type FROM pre_channel A WHERE A.type IN ({$idIn}) {$statusSql} ORDER BY A.id ASC");
+		if(!$list){
+			$msg = $net === ''
+				? ('没有找到币种='.$cur.' 原生币的支付通道，请先在「支付通道」中添加并启用')
+				: ('没有找到币种='.$cur.' 网络='.$net.' 的支付通道，请先在「支付通道」中添加并启用');
+			exit(json_encode(['code'=>-1,'msg'=>$msg], JSON_UNESCAPED_UNICODE));
+		}
+		// 拼上对应支付方式 showname 便于区分（同币种网络可能跨多个 pre_type）
+		foreach($list as &$lr){
+			$tn = isset($matchedShowname[(int)$lr['type']]) ? $matchedShowname[(int)$lr['type']] : '';
+			if($tn !== '') $lr['name'] = $lr['name'].' ['.$tn.']';
+			unset($lr['type']);
+		}
+		unset($lr);
 	}else{
 		$type = (int)$row['type'];
 		$list=$DB->getAll("SELECT A.id, A.name FROM pre_channel A WHERE A.type='{$type}' {$statusSql} ORDER BY A.id ASC");
