@@ -24,6 +24,9 @@ class EpayCore
     // 发起支付（页面跳转）
     public function pagePay($param_tmp, $button='正在跳转'){
         $requrl = $this->apiurl.'api/pay/submit';
+        // 兼容部分第三方/特制网关：将 submit 路由规则纳入签名参数
+        // 这类网关会把 s=pay/submit 也算进验签内容里。
+        $param_tmp['s'] = 'pay/submit';
         $param = $this->buildRequestParam($param_tmp);
 
         $html = '<form id="dopay" action="'.$requrl.'" method="post">';
@@ -38,6 +41,8 @@ class EpayCore
     // 发起支付（获取链接）
     public function getPayLink($param_tmp){
         $requrl = $this->apiurl.'api/pay/submit';
+        // 兼容部分第三方/特制网关：将 submit 路由规则纳入签名参数
+        $param_tmp['s'] = 'pay/submit';
         $param = $this->buildRequestParam($param_tmp);
         $url = $requrl.'?'.http_build_query($param);
         return $url;
