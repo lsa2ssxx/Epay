@@ -55,5 +55,6 @@ Bepusdt 是适用于彩虹易支付系统的 USDT 收款插件，收到的货币
 **插件开源地址**：  
 🔗 [https://github.com/v03413/bepusdt](https://github.com/v03413/bepusdt)
 
----
+**本项目融合文档**：[Epay 与 BEpusdt 融合说明](docs/BEpusdt_INTEGRATION.md)
 
+---
