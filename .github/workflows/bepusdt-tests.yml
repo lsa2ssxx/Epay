@@ -29,13 +29,13 @@ jobs:
           --health-timeout=5s
           --health-retries=10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ matrix.php }}
           extensions: curl, mbstring, pdo_mysql
           coverage: none
-      - uses: ramsey/composer-install@v3
+      - uses: ramsey/composer-install@v4
       - run: composer test
         env:
           EPAY_TEST_DSN: mysql:host=127.0.0.1;port=3306;dbname=epay_test;charset=utf8mb4
