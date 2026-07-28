@@ -86,6 +86,7 @@ function crypto_chain_label(string $currency, string $chain): string
 		'polygon' => 'Polygon', '.pol' => 'Polygon',
 		'arbitrum' => 'Arbitrum', 'solana' => 'Solana', 'aptos' => 'Aptos',
 		'xlayer' => 'X Layer', 'base' => 'Base', 'plasma' => 'Plasma',
+		'ton' => 'TON', '.gram' => 'TON',
 	];
 	foreach ($map as $kw => $tag) {
 		if (strpos($n, $kw) !== false) return $tag;

@@ -14,11 +14,13 @@
 		aptos: '/assets/icon/chain/aptos.png',
 		xlayer: '/assets/icon/chain/xlayer.png',
 		base: '/assets/icon/chain/base.png',
-		plasma: '/assets/icon/chain/plasma.png'
+		plasma: '/assets/icon/chain/plasma.png',
+		ton: '/assets/icon/chain/ton.svg'
 	};
 
 	function payTypeIconSrc(typename) {
 		var s = String(typename || '').replace(/[^A-Za-z0-9._\-]/g, '');
+		if (s === 'ton.gram') return '/assets/icon/ton.gram.svg';
 		return '/assets/icon/' + s + '.ico';
 	}
 
@@ -37,7 +39,8 @@
 			aptos: { label: 'APT', bg: '#111111' },
 			xlayer: { label: 'XL', bg: '#2d2d2d' },
 			base: { label: 'BAS', bg: '#0052FF' },
-			plasma: { label: 'PLM', bg: '#6B46C1' }
+			plasma: { label: 'PLM', bg: '#6B46C1' },
+			ton: { label: 'TON', bg: '#0098EA' }
 		};
 		var b = map[chain];
 		var title = token + ' · ' + chain;

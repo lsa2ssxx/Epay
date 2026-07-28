@@ -76,7 +76,7 @@ function cm_currency_icon_html($cat)
 
 	$has_native_ico = [
 		'tron.trx', 'ethereum.eth', 'bsc.bnb', 'polygon.pol',
-		'solana.sol', 'aptos.apt',
+		'solana.sol', 'aptos.apt', 'ton.gram',
 		'alipay', 'wxpay', 'wechat', 'qqpay', 'jdpay', 'bank', 'paypal',
 	];
 	if (in_array($icon, $has_native_ico, true)) {
@@ -89,6 +89,7 @@ function cm_currency_icon_html($cat)
 		'DAI'  => '#F4B731',
 		'BTC'  => '#F7931A',
 		'ETH'  => '#627EEA',
+		'GRAM' => '#0098EA',
 	];
 	$bg = $brand_bg[$key] ?? '#5B6CFF';
 	$label = htmlspecialchars(substr($key, 0, 4), ENT_QUOTES, 'UTF-8');

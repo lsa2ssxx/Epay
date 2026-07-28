@@ -7,6 +7,59 @@ if(!checkRefererHost())exit('{"code":403}');
 
 @header('Content-Type: application/json; charset=UTF-8');
 
+function epay_validate_channel_plugin_type($pluginName, $typeId)
+{
+	global $DB;
+	if(!preg_match('/^[A-Za-z0-9_]+$/', (string)$pluginName)){
+		throw new RuntimeException('支付插件名称不合法');
+	}
+	$typeName = $DB->getColumn(
+		'SELECT name FROM pre_type WHERE id=:id LIMIT 1',
+		[':id'=>(int)$typeId]
+	);
+	if(!$typeName){
+		throw new RuntimeException('支付方式不存在');
+	}
+	$plugin = \lib\Plugin::getConfig((string)$pluginName);
+	if(!$plugin){
+		throw new RuntimeException('支付插件不存在');
+	}
+	$supported = isset($plugin['types']) && is_array($plugin['types'])
+		? $plugin['types']
+		: array_filter(explode(',', (string)($plugin['types'] ?? '')));
+	if(!in_array($typeName, $supported, true)){
+		throw new RuntimeException('所选支付插件不支持该支付方式');
+	}
+	return $typeName;
+}
+
+function epay_validate_bepusdt_config(array $config)
+{
+	require_once PLUGIN_ROOT.'bepusdt/BepusdtProtocol.php';
+	$config['appurl'] = BepusdtProtocol::normalizeGatewayUrl((string)($config['appurl'] ?? ''));
+	$config['appkey'] = trim((string)($config['appkey'] ?? ''));
+	if($config['appkey'] === ''){
+		throw new RuntimeException('BEpusdt 认证 Token 不能为空');
+	}
+	if(isset($config['timeout']) && trim((string)$config['timeout']) !== ''){
+		if(!ctype_digit(trim((string)$config['timeout'])) || (int)$config['timeout'] < 120){
+			throw new RuntimeException('BEpusdt 订单超时必须是大于等于 120 的整数秒数');
+		}
+		$config['timeout'] = (string)(int)$config['timeout'];
+	}
+	if(isset($config['rate']) && trim((string)$config['rate']) !== ''){
+		$rate = trim((string)$config['rate']);
+		if(!preg_match('/^~?(?:0|[1-9]\d*)(?:\.\d+)?$/', $rate) || (float)ltrim($rate, '~') <= 0){
+			throw new RuntimeException('BEpusdt 订单汇率格式不合法');
+		}
+		$config['rate'] = $rate;
+	}
+	if(isset($config['unified_cashier']) && !in_array((string)$config['unified_cashier'], ['0','1'], true)){
+		throw new RuntimeException('BEpusdt 统一收银台配置不合法');
+	}
+	return $config;
+}
+
 switch($act){
 case 'channelList':
 	$sql=" 1=1";
@@ -170,6 +223,7 @@ case 'importBepusdtChannels':
 		exit('{"code":-1,"msg":"BEpusdt 插件不存在或未声明 inputs"}');
 	}
 	$inputKeys = array_keys($pluginCfg['inputs']);
+	$supportedTypes = isset($pluginCfg['types']) && is_array($pluginCfg['types']) ? $pluginCfg['types'] : [];
 
 	foreach($list as $idx => $item){
 		if(!is_array($item)){
@@ -193,6 +247,11 @@ case 'importBepusdtChannels':
 		if(!preg_match('/^[a-zA-Z0-9_.]+$/', $typeName)){
 			$failed++;
 			if(count($errors) < 10) $errors[] = '第'.($idx+1).'条：type 格式不合法（仅允许字母数字下划线点）';
+			continue;
+		}
+		if(!in_array($typeName, $supportedTypes, true)){
+			$failed++;
+			if(count($errors) < 10) $errors[] = '第'.($idx+1).'条：BEpusdt 不支持该支付方式';
 			continue;
 		}
 
@@ -252,21 +311,12 @@ case 'importBepusdtChannels':
 				$cfg[$k] = '';
 			}
 		}
-		$appurl = trim((string)($cfg['appurl'] ?? ''));
-		$appkey = trim((string)($cfg['appkey'] ?? ''));
-		if($appurl === '' || $appkey === ''){
+		try{
+			$cfg = epay_validate_bepusdt_config($cfg);
+		}catch(Throwable $e){
 			$failed++;
-			if(count($errors) < 10) $errors[] = '第'.($idx+1).'条：config.appurl/config.appkey 不能为空';
+			if(count($errors) < 10) $errors[] = '第'.($idx+1).'条：'.$e->getMessage();
 			continue;
-		}
-		if(!preg_match('#^https?://#i', $appurl)){
-			$failed++;
-			if(count($errors) < 10) $errors[] = '第'.($idx+1).'条：config.appurl 必须以 http(s):// 开头';
-			continue;
-		}
-		if(substr($appurl, -1) !== '/'){
-			$appurl .= '/';
-			$cfg['appurl'] = $appurl;
 		}
 
 		$data = [
@@ -384,6 +434,18 @@ case 'setChannel':
 	if($status==1 && empty($row['config'])){
 		exit('{"code":-1,"msg":"请先配置好密钥后再开启"}');
 	}
+	if($status==1){
+		try{
+			epay_validate_channel_plugin_type($row['plugin'], $row['type']);
+			if($row['plugin'] === 'bepusdt'){
+				$config = json_decode($row['config'], true);
+				if(!is_array($config)) throw new RuntimeException('BEpusdt 配置格式不合法');
+				epay_validate_bepusdt_config($config);
+			}
+		}catch(Throwable $e){
+			exit(json_encode(['code'=>-1,'msg'=>$e->getMessage()], JSON_UNESCAPED_UNICODE));
+		}
+	}
 	if($status==1 && $conf['admin_pwd']=='123456'){
 		exit('{"code":-1,"msg":"请先修改默认管理员密码后再开启支付通道"}');
 	}
@@ -454,6 +516,11 @@ case 'saveChannel':
 		}
 		$cashier_ok = isset($_POST['cashier_ok']) ? intval($_POST['cashier_ok']) : 1;
 		if($cashier_ok !== 0) $cashier_ok = 1;
+		try{
+			epay_validate_channel_plugin_type($plugin, $type);
+		}catch(Throwable $e){
+			exit(json_encode(['code'=>-1,'msg'=>$e->getMessage()], JSON_UNESCAPED_UNICODE));
+		}
 		$row=$DB->getRow("SELECT * FROM pre_channel WHERE name='$name' LIMIT 1");
 		if($row)
 			exit('{"code":-1,"msg":"支付通道名称重复"}');
@@ -490,6 +557,11 @@ case 'saveChannel':
 		}
 		$cashier_ok = isset($_POST['cashier_ok']) ? intval($_POST['cashier_ok']) : 1;
 		if($cashier_ok !== 0) $cashier_ok = 1;
+		try{
+			epay_validate_channel_plugin_type($plugin, $type);
+		}catch(Throwable $e){
+			exit(json_encode(['code'=>-1,'msg'=>$e->getMessage()], JSON_UNESCAPED_UNICODE));
+		}
 		$nrow=$DB->getRow("SELECT * FROM pre_channel WHERE name='$name' LIMIT 1");
 		if($nrow)
 			exit('{"code":-1,"msg":"支付通道名称重复"}');
@@ -526,6 +598,11 @@ case 'saveChannel':
 		}
 		$cashier_ok = isset($_POST['cashier_ok']) ? intval($_POST['cashier_ok']) : 1;
 		if($cashier_ok !== 0) $cashier_ok = 1;
+		try{
+			epay_validate_channel_plugin_type($plugin, $type);
+		}catch(Throwable $e){
+			exit(json_encode(['code'=>-1,'msg'=>$e->getMessage()], JSON_UNESCAPED_UNICODE));
+		}
 		$nrow=$DB->getRow("SELECT * FROM pre_channel WHERE name='$name' AND id<>$id LIMIT 1");
 		if($nrow)
 			exit('{"code":-1,"msg":"支付通道名称重复"}');
@@ -613,6 +690,8 @@ case 'channelInfo':
 break;
 case 'saveChannelInfo':
 	$id=intval($_GET['id']);
+	$row=$DB->getRow("SELECT * FROM pre_channel WHERE id='$id' LIMIT 1");
+	if(!$row) exit('{"code":-1,"msg":"当前支付通道不存在！"}');
 	$config=isset($_POST['config'])?$_POST['config']:null;
 	$appwxmp=isset($_POST['appwxmp'])?intval($_POST['appwxmp']):null;
 	$appwxa=isset($_POST['appwxa'])?intval($_POST['appwxa']):null;
@@ -623,6 +702,15 @@ case 'saveChannelInfo':
 		$apptype=null;
 	}
 	if(empty($config)) exit('{"code":-1,"msg":"填写的内容不能为空"}');
+	if(!is_array($config)) exit('{"code":-1,"msg":"支付配置格式不合法"}');
+	try{
+		epay_validate_channel_plugin_type($row['plugin'], $row['type']);
+		if($row['plugin'] === 'bepusdt'){
+			$config = epay_validate_bepusdt_config($config);
+		}
+	}catch(Throwable $e){
+		exit(json_encode(['code'=>-1,'msg'=>$e->getMessage()], JSON_UNESCAPED_UNICODE));
+	}
 	$config = json_encode($config);
 	$data = ['config'=>$config, 'apptype'=>$apptype, 'appwxmp'=>$appwxmp, 'appwxa'=>$appwxa];
 	if($DB->update('channel', $data, ['id'=>$id])!==false)exit('{"code":0,"msg":"修改支付密钥成功！"}');

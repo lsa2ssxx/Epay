@@ -2,8 +2,8 @@
 /**
  * 加密货币收银台支付结果过渡页
  *
- * 统一展示：「已检测」→「已完成」；state=detected&staged=1+已付 为各通道共用的纯展示过渡（无链上则文案为系统确认）。
- * 无 staged、未付、有 detected_at：链上待确认。state=completed：可返回商家。
+ * 统一展示：「正在确认订单」→「付款已完成」。
+ * state=detected&staged=1 只是已支付订单的短暂界面过渡，不表达链上检测状态。
  */
 $is_defend = true;
 $nosession = true;
@@ -29,14 +29,13 @@ if (!$row) {
 	exit;
 }
 
-// 根据订单真实状态与 ext 中 detection 信息，修正 URL 中用户传入的 state
+// URL 中的过渡状态必须服从数据库中的真实支付状态。
 $ext = [];
 if (!empty($row['ext'])) {
 	$decoded = @unserialize($row['ext']);
 	if (is_array($decoded)) $ext = $decoded;
 }
 
-$has_detected  = !empty($ext['detected_at']);
 $order_paid    = (int) $row['status'] === 1;
 $order_error   = (int) $row['status'] === 2;
 $ux_staged     = false;
@@ -45,9 +44,7 @@ if ($order_error) {
 	header('Location: /payerr.html');
 	exit;
 }
-// staged=1 + 已支付：展示用「已检测」过渡，再到 completed（非链上无 detected_at 也可，纯 UX）
-// 未支付 + 有链上 detected_at：真实「待确认」
-// 已支付 且 非 (staged&detected)：直接看完成页
+// 只有已支付订单可以展示短暂过渡；未支付订单返回收银台。
 if ($order_paid) {
 	if ($staged && $state === 'detected') {
 		$ux_staged = true;
@@ -58,21 +55,18 @@ if ($order_paid) {
 	header('Location: /cashier.php?trade_no=' . urlencode($trade_no));
 	exit;
 }
-$chain_pending = false;
-
 /* ---------- 展示字段组装 ---------- */
 $cm_site_name = isset($conf['sitename']) && $conf['sitename'] !== ''
 	? (string) $conf['sitename']
 	: 'Epay';
 
 $payment_id    = $row['out_trade_no'] ? (string) $row['out_trade_no'] : (string) $row['trade_no'];
-$transaction_id = (string) ($ext['detected_tx'] ?? ($row['api_trade_no'] ?? ''));
+$transaction_id = (string) ($row['bill_trade_no'] ?: ($row['api_trade_no'] ?? ''));
 $product_name  = (string) ($row['name'] ?? '');
 
-$detected_at = $has_detected ? (string) $ext['detected_at'] : '';
-$completed_at = $row['endtime'] ? (string) $row['endtime'] : ($detected_at ?: (string) $row['addtime']);
-$show_time_label = $state === 'completed' ? '完成时间' : '检测时间';
-$show_time_value = $state === 'completed' ? $completed_at : ($detected_at ?: $completed_at);
+$completed_at = $row['endtime'] ? (string) $row['endtime'] : (string) $row['addtime'];
+$show_time_label = $state === 'completed' ? '完成时间' : '确认时间';
+$show_time_value = $completed_at;
 
 $pay_currency = (string) ($ext['currency'] ?? '');
 $pay_amount   = (string) ($ext['amount'] ?? '');
@@ -98,14 +92,9 @@ if ($state === 'completed') {
 		: '您已成功完成本次付款。';
 	$cm_btn     = '返回商家';
 } else {
-	$cm_title   = '付款已检测';
-	if ($ux_staged && !$has_detected) {
-		$cm_desc  = '系统已收到成功支付结果，正在完成订单确认…';
-		$cm_desc2 = '';
-	} else {
-		$cm_desc  = '您的付款已出现在区块链上。一旦确认完成，商户将收到通知，订单即可完成。';
-		$cm_desc2 = '付款确认后您将会收到一封电子邮件通知。';
-	}
+	$cm_title   = '正在确认订单';
+	$cm_desc    = '系统已收到成功支付结果，正在完成订单确认…';
+	$cm_desc2   = '';
 	$cm_btn     = '返回商家';
 }
 
@@ -233,8 +222,7 @@ window.CM_CONFIG = {
 window.CM_PAYSUCCESS = {
 	tradeNo: <?php echo json_encode($trade_no); ?>,
 	state: <?php echo json_encode($state); ?>,
-	uxStaged: <?php echo !empty($ux_staged) ? 'true' : 'false'; ?>,
-	chainPending: <?php echo !empty($chain_pending) ? 'true' : 'false'; ?>
+	uxStaged: <?php echo !empty($ux_staged) ? 'true' : 'false'; ?>
 };
 </script>
 <script src="/assets/js/cashier-modern.js?v=3"></script>
@@ -244,7 +232,6 @@ window.CM_PAYSUCCESS = {
 	var tradeNo = cfg.tradeNo;
 	var currentState = cfg.state;
 	var uxStaged = cfg.uxStaged === true;
-	var chainPending = cfg.chainPending === true;
 
 	// 复制按钮（同 crypto.php 的 fallback 行为）
 	document.addEventListener('click', function(e){
@@ -341,9 +328,8 @@ window.CM_PAYSUCCESS = {
 		xhr.send();
 	}
 
-	// 链上待确认：轮询到 code=1 再进 completed；staged+已付：纯展示后进入
+	// 已支付订单仅作短暂展示后进入 completed。
 	var MIN_STAGED_MS = 2200;
-	var MIN_CHAIN_MS = 3500;
 	var loadedAt = Date.now();
 	var transitioned = false;
 
@@ -354,33 +340,14 @@ window.CM_PAYSUCCESS = {
 	}
 
 	function scheduleGoCompleted(floorMs){
-		var min = floorMs != null ? floorMs : (uxStaged ? MIN_STAGED_MS : MIN_CHAIN_MS);
+		var min = floorMs != null ? floorMs : MIN_STAGED_MS;
 		var elapsed = Date.now() - loadedAt;
 		var wait = Math.max(0, min - elapsed);
 		setTimeout(goCompleted, wait);
 	}
 
-	function pollForComplete(){
-		if (currentState !== 'detected' || transitioned) return;
-		var xhr = new XMLHttpRequest();
-		xhr.open('GET', '/getshop.php?trade_no=' + encodeURIComponent(tradeNo), true);
-		xhr.onreadystatechange = function(){
-			if (xhr.readyState !== 4) return;
-			try {
-				var d = JSON.parse(xhr.responseText);
-				if (d && d.code == 1) {
-					scheduleGoCompleted(MIN_CHAIN_MS);
-					return;
-				}
-			} catch(e) {}
-			setTimeout(pollForComplete, 2500);
-		};
-		xhr.send();
-	}
 	if (currentState === 'detected' && uxStaged) {
 		scheduleGoCompleted(MIN_STAGED_MS);
-	} else if (currentState === 'detected' && chainPending) {
-		setTimeout(pollForComplete, 800);
 	}
 })();
 </script>

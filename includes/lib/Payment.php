@@ -283,7 +283,11 @@ class Payment {
     static public function processOrder($isnotify, $order, $api_trade_no, $buyer = null, $bill_trade_no = null, $bill_mch_trade_no = null, $end_time = null){
         global $DB,$conf,$siteurl;
         if($order['status']==0 || $order['status']==4){
-            if($DB->exec("UPDATE `pre_order` SET `status`=1 WHERE `trade_no`='".$order['trade_no']."'")){
+            $updated = $DB->exec(
+                "UPDATE `pre_order` SET `status`=1 WHERE `trade_no`=:trade_no AND `status` IN (0,4)",
+                [':trade_no'=>$order['trade_no']]
+            );
+            if($updated === 1){
 
                 $data = ['endtime'=>'NOW()', 'date'=>'CURDATE()'];
                 if(!empty($api_trade_no)){
@@ -353,6 +357,45 @@ class Payment {
     static public function updateOrderExt($trade_no, $data){
         global $DB;
         $DB->update('order', ['ext'=>serialize($data)], ['trade_no'=>$trade_no]);
+    }
+
+    // 在行锁内合并订单扩展信息，避免多个异步流程互相覆盖
+    static public function mergeOrderExt($trade_no, $changes){
+        global $DB;
+        if(!is_array($changes)){
+            throw new \InvalidArgumentException('订单扩展信息必须是数组');
+        }
+
+        $DB->beginTransaction();
+        try{
+            $row = $DB->getRow(
+                "SELECT `ext` FROM `pre_order` WHERE `trade_no`=:trade_no LIMIT 1 FOR UPDATE",
+                [':trade_no'=>$trade_no]
+            );
+            if(!$row){
+                throw new \RuntimeException('订单不存在');
+            }
+
+            $ext = [];
+            if(!empty($row['ext'])){
+                $decoded = @unserialize($row['ext'], ['allowed_classes'=>false]);
+                if(is_array($decoded)){
+                    $ext = $decoded;
+                }
+            }
+            foreach($changes as $key=>$value){
+                $ext[$key] = $value;
+            }
+
+            if($DB->update('order', ['ext'=>serialize($ext)], ['trade_no'=>$trade_no]) === false){
+                throw new \RuntimeException('更新订单扩展信息失败');
+            }
+            $DB->commit();
+            return $ext;
+        }catch(\Throwable $e){
+            $DB->rollBack();
+            throw $e;
+        }
     }
 
     // 更新合单状态

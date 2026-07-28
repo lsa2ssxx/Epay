@@ -1,82 +1,55 @@
 <?php
 
+require_once __DIR__ . '/BepusdtProtocol.php';
+
 class bepusdt_plugin
 {
     public static $info = [
-        'name'     => 'bepusdt',
-        'showname' => 'BEpusdt USDT/USDC 个人收款',
-        'author'   => 'V03413',
-        'link'     => 'https://github.com/v03413/BEpusdt',
-        // 与 tradeTypeCatalog() 同步；权威列表见 https://github.com/v03413/BEpusdt/blob/main/docs/trade-type.md
-        'types'    => [
-            'usdt.trc20',
-            'usdc.trc20',
-            'tron.trx',
-            'usdt.erc20',
-            'usdc.erc20',
-            'ethereum.eth',
-            'usdt.polygon',
-            'usdc.polygon',
-            'usdt.bep20',
-            'usdc.bep20',
-            'bsc.bnb',
-            'usdt.aptos',
-            'usdc.aptos',
-            'usdt.solana',
-            'usdc.solana',
-            'usdt.xlayer',
-            'usdc.xlayer',
-            'usdt.arbitrum',
-            'usdc.arbitrum',
-            'usdc.base',
-            'usdt.plasma',
-        ],
-        'inputs'   => [
-            'appurl'  => [
+        'name' => 'bepusdt',
+        'showname' => 'BEpusdt 加密货币个人收款',
+        'author' => 'V03413',
+        'link' => 'https://github.com/v03413/BEpusdt',
+        'types' => [],
+        'inputs' => [
+            'appurl' => [
                 'name' => '接口地址',
                 'type' => 'input',
-                'note' => '必须以http://或https://开头，以/结尾',
+                'note' => '必须是有效 HTTPS 地址，并以 / 结尾',
             ],
-            'appkey'  => [
+            'appkey' => [
                 'name' => '认证Token',
                 'type' => 'input',
-                'note' => 'BEpusdt后台【系统管理→基本设置→API设置→对接令牌】获取，非Docker环境变量',
+                'note' => 'BEpusdt后台【系统管理→基本设置→API设置→对接令牌】获取',
             ],
             'address' => [
                 'name' => '收款地址',
                 'type' => 'input',
-                'note' => '可以留空 留空则由BEpusdt自动分配，切勿乱填 注意空格',
+                'note' => '可以留空，留空则由 BEpusdt 自动分配',
             ],
             'timeout' => [
                 'name' => '订单超时',
                 'type' => 'input',
-                'note' => '可以留空 填写整数(单位秒)、推荐 1200',
+                'note' => '可以留空；单位秒，最低 120，推荐 1200',
             ],
-            'rate'    => [
+            'rate' => [
                 'name' => '订单汇率',
                 'type' => 'input',
-                'note' => '可以留空 例如：7.4 ~1.02 ~0.98（不明白切勿乱填）',
+                'note' => '可以留空，例如 7.4、~1.02、~0.98',
             ],
             'unified_cashier' => [
                 'name' => '统一收银台',
                 'type' => 'select',
                 'options' => [
                     '0' => '关闭（跳转 BEpusdt 官方收银页）',
-                    '1' => '开启（在本站内渲染地址+金额+二维码）',
+                    '1' => '开启（在本站内展示地址、金额和二维码）',
                 ],
-                'note' => '开启后：下单后直接在本站收银台展示收款地址与金额，保持站点品牌与 UI 一致；回调链路不变。',
+                'note' => '开启后使用本站收银台；回调链路不变。',
             ],
         ],
-        'select'   => null,
-        'note'     => '', //支付密钥填写说明
+        'select' => null,
+        'note' => '',
     ];
 
-    /**
-     * BEpusdt API trade_type 与 Epay 支付方式展示名（用于后台一键导入）。
-     * 顺序与官方文档表格一致，便于对照维护。
-     *
-     * @return array<int, array{name:string, showname:string}>
-     */
     public static function tradeTypeCatalog(): array
     {
         return [
@@ -101,6 +74,8 @@ class bepusdt_plugin
             ['name' => 'usdc.arbitrum', 'showname' => 'USDC-Arbitrum'],
             ['name' => 'usdc.base', 'showname' => 'USDC-Base'],
             ['name' => 'usdt.plasma', 'showname' => 'USDT-Plasma'],
+            ['name' => 'usdt.ton', 'showname' => 'USDT-TON'],
+            ['name' => 'ton.gram', 'showname' => 'GRAM-TON'],
         ];
     }
 
@@ -108,211 +83,137 @@ class bepusdt_plugin
     {
         global $siteurl, $channel, $order, $conf;
 
-        // BEpusdt 签名规则：空值不参与签名，仅发送有值的参数以确保双方签名一致
-        $parameter = [
-            'order_id'     => TRADE_NO,
-            'amount'       => floatval($order['realmoney']),
-            'notify_url'   => $conf['localurl'] . 'pay/notify/' . TRADE_NO . '/',
-            'redirect_url' => $siteurl . 'pay/return/' . TRADE_NO . '/',
-        ];
-
-        $trade_type = self::_normalizeTradeType($order['typename']);
-        if ($trade_type) {
-            $parameter['trade_type'] = $trade_type;
-        }
-
-        $address = trim($channel['address'] ?? '');
-        if ($address !== '') {
-            $parameter['address'] = $address;
-        }
-
-        $name = trim($order['name'] ?? '');
-        if ($name !== '') {
-            $parameter['name'] = $name;
-        }
-
-        $timeout = intval($channel['timeout'] ?? 0);
-        if ($timeout > 0) {
-            $parameter['timeout'] = $timeout;
-        }
-
-        $rate = trim(strval($channel['rate'] ?? ''));
-        if ($rate !== '') {
-            $parameter['rate'] = $rate;
-        }
-
-        $parameter['signature'] = self::_toSign($parameter, $channel['appkey']);
-
-        $url  = trim($channel['appurl']) . 'api/v1/order/create-transaction';
-        $data = self::_post($url, $parameter);
-        if (!is_array($data)) {
-
-            return ['type' => 'error', 'msg' => '请求失败，请检查服务器是否能正常请求 BEpusdt 网关！'];
-        }
-
-        if ($data['status_code'] != 200) {
-
-            return ['type' => 'error', 'msg' => '请求失败，错误信息：' . $data['message']];
-        }
-
-        $payload = is_array($data['data']) ? $data['data'] : [];
-        $payment_url = $payload['payment_url'] ?? '';
-
-        // 统一收银台：保留完整支付上下文并渲染站内页面
-        if (!empty($channel['unified_cashier'])) {
-            $payinfo = self::_buildUnifiedPayInfo($payload, $trade_type ?? '');
-            \lib\Payment::updateOrderExt(TRADE_NO, $payinfo);
-            if (!empty($payload['trade_id'])) {
-                \lib\Payment::updateOrder(TRADE_NO, $payload['trade_id']);
+        try {
+            $tradeType = BepusdtProtocol::normalizeTradeType((string) $order['typename']);
+            if (!in_array($tradeType, array_column(self::tradeTypeCatalog(), 'name'), true)) {
+                throw new BepusdtProtocolException('当前 BEpusdt 插件不支持该支付类型');
             }
 
-            return [
-                'type' => 'page',
-                'page' => 'crypto',
-                'data' => self::_unifiedPageData($payinfo),
-            ];
-        }
+            $appUrl = BepusdtProtocol::normalizeGatewayUrl((string) ($channel['appurl'] ?? ''));
+            $appKey = trim((string) ($channel['appkey'] ?? ''));
+            if ($appKey === '') {
+                throw new BepusdtProtocolException('BEpusdt 认证 Token 不能为空');
+            }
 
-        return ['type' => 'jump', 'url' => $payment_url];
+            $notifyUrl = rtrim((string) $conf['localurl'], '/') . '/pay/notify/' . TRADE_NO . '/';
+            $redirectUrl = rtrim((string) $siteurl, '/') . '/pay/return/' . TRADE_NO . '/';
+            if(!BepusdtProtocol::isHttpsUrl($notifyUrl) || !BepusdtProtocol::isHttpsUrl($redirectUrl)){
+                throw new BepusdtProtocolException('Epay 回调地址和返回地址必须使用 HTTPS');
+            }
+
+            $parameter = [
+                'order_id' => (string) TRADE_NO,
+                'amount' => (float) $order['realmoney'],
+                'fiat' => 'CNY',
+                'trade_type' => $tradeType,
+                'notify_url' => $notifyUrl,
+                'redirect_url' => $redirectUrl,
+            ];
+
+            $rate = trim((string) ($channel['rate'] ?? ''));
+            if($rate !== '' && (
+                !preg_match('/^~?(?:0|[1-9]\d*)(?:\.\d+)?$/', $rate)
+                || (float)ltrim($rate, '~') <= 0
+            )){
+                throw new BepusdtProtocolException('BEpusdt 订单汇率格式不合法');
+            }
+            $optional = [
+                'address' => trim((string) ($channel['address'] ?? '')),
+                'name' => trim((string) ($order['name'] ?? '')),
+                'rate' => $rate,
+            ];
+            foreach ($optional as $key => $value) {
+                if ($value !== '') {
+                    $parameter[$key] = $value;
+                }
+            }
+
+            $timeout = (int) ($channel['timeout'] ?? 0);
+            if ($timeout > 0) {
+                if ($timeout < 120) {
+                    throw new BepusdtProtocolException('BEpusdt 订单超时不能低于 120 秒');
+                }
+                $parameter['timeout'] = $timeout;
+            }
+
+            $parameter['signature'] = BepusdtProtocol::sign($parameter, $appKey);
+            $response = BepusdtHttpClient::postJson($appUrl . 'api/v1/order/create-transaction', $parameter);
+            $payload = BepusdtProtocol::validateCreateResponse(
+                $response,
+                (string) TRADE_NO,
+                $tradeType,
+                'CNY',
+                (string) $order['realmoney']
+            );
+
+            \lib\Payment::updateOrder(TRADE_NO, (string) $payload['trade_id']);
+
+            if (!empty($channel['unified_cashier'])) {
+                $payInfo = self::buildUnifiedPayInfo($payload, $tradeType);
+                \lib\Payment::mergeOrderExt(TRADE_NO, $payInfo);
+
+                return [
+                    'type' => 'page',
+                    'page' => 'crypto',
+                    'data' => self::unifiedPageData($payInfo),
+                ];
+            }
+
+            return ['type' => 'jump', 'url' => (string) $payload['payment_url']];
+        } catch (BepusdtProtocolException $e) {
+            return ['type' => 'error', 'msg' => $e->getMessage()];
+        } catch (\Throwable $e) {
+            error_log('BEpusdt submit failed: '.$e->getMessage());
+            return ['type' => 'error', 'msg' => 'BEpusdt 下单失败，请稍后重试'];
+        }
     }
 
-    /**
-     * API 模式下，若开启统一收银台则返回 crypto 类型，由 Payment::echoJson 序列化为 pay_info 对象。
-     * 未开启统一收银台时回退为 submit 流程（走站内跳转页）。
-     */
     public static function mapi(): array
     {
         global $channel;
 
         $result = self::submit();
-        if (!empty($channel['unified_cashier']) && isset($result['type']) && $result['type'] === 'page') {
-            return [
-                'type' => 'crypto',
-                'data' => $result['data'],
-            ];
+        if (!empty($channel['unified_cashier']) && ($result['type'] ?? '') === 'page') {
+            return ['type' => 'crypto', 'data' => $result['data']];
         }
         return $result;
-    }
-
-    /**
-     * 将 BEpusdt 响应整理为统一收银台所需的上下文
-     *
-     * @param array<string, mixed> $payload   BEpusdt /create-transaction 响应的 data 段
-     * @param string               $trade_type 请求时的 trade_type（如 usdt.trc20），用于展示
-     * @return array<string, mixed>
-     */
-    private static function _buildUnifiedPayInfo(array $payload, string $trade_type): array
-    {
-        $currency = $trade_type !== '' ? $trade_type : (string) ($payload['trade_type'] ?? '');
-        $expire_sec = intval($payload['expiration_time'] ?? 0);
-        return [
-            'plugin'        => 'bepusdt',
-            'address'       => (string) ($payload['token'] ?? ''),
-            'amount'        => (string) ($payload['actual_amount'] ?? ''),
-            'currency'      => $currency,
-            'chain'         => '', // BEpusdt 的 trade_type 已包含链信息，chain_label 由前端自行推断
-            'fiat'          => (string) ($payload['fiat'] ?? 'CNY'),
-            'fiat_amount'   => (string) ($payload['amount'] ?? ''),
-            'expire_at'     => $expire_sec > 0 ? time() + $expire_sec : 0,
-            'qrcode'        => '', // BEpusdt 不直接返回二维码图片，前端用地址本地生成
-            'fallback_url'  => (string) ($payload['payment_url'] ?? ''),
-            'api_trade_no'  => (string) ($payload['trade_id'] ?? ''),
-        ];
-    }
-
-    /**
-     * 将扩展数据展开为 type=page 所需的局部变量键
-     *
-     * @param array<string, mixed> $ext
-     * @return array<string, mixed>
-     */
-    private static function _unifiedPageData(array $ext): array
-    {
-        return [
-            'pay_plugin'       => 'BEpusdt',
-            'pay_address'      => $ext['address'] ?? '',
-            'pay_amount'       => $ext['amount'] ?? '',
-            'pay_currency'     => $ext['currency'] ?? '',
-            'pay_chain'        => $ext['chain'] ?? '',
-            'pay_fiat'         => $ext['fiat'] ?? 'CNY',
-            'pay_fiat_amount'  => $ext['fiat_amount'] ?? '',
-            'pay_expire_at'    => (int) ($ext['expire_at'] ?? 0),
-            'pay_qrcode'       => $ext['qrcode'] ?? '',
-            'pay_fallback_url' => $ext['fallback_url'] ?? '',
-        ];
     }
 
     public static function notify()
     {
         global $channel, $order;
 
-        ob_clean();
-        header('Content-Type: plain/text; charset=utf-8');
-
-        $data = json_decode(file_get_contents('php://input'), true);
-        $sign = $data['signature'] ?? '';
-        if ($sign != self::_toSign($data, $channel['appkey'])) {
-            // 签名验证失败
-
-            exit('fail - sign error');
+        if (ob_get_level() > 0) {
+            ob_clean();
         }
 
-        $out_trade_no = $data['order_id'];    // 商户订单号
-        $trade_no     = $data['trade_id'];    // BEpusdt 交易ID
-        $buyer        = mb_substr($data['buyer'] ?? '', -28);
-        $status       = isset($data['status']) ? (int) $data['status'] : 0;
-
-        if ($out_trade_no != TRADE_NO) {
-            exit('fail - order mismatch');
-        }
-
-        // status=1 链上已检测但未确认：仅登记检测状态，不修改订单支付状态
-        if ($status === 1) {
-            self::_markDetected($order, $trade_no, $buyer);
-            exit('ok');
-        }
-
-        if ($status === 2) {
-            // 确认前补登检测状态，保证前端能先走 detected → completed 的流式过渡
-            self::_markDetected($order, $trade_no, $buyer);
-            processNotify($order, $trade_no, $buyer);
-
-            exit('ok');
-        }
-
-        exit('fail - status error');
-    }
-
-    /**
-     * 将链上检测信息回写到 pre_order.ext，供收银台前端读取展示。
-     * 不会覆盖同一订单的历史 detection 记录（例如重复回调）。
-     *
-     * @param array  $order    当前订单行
-     * @param string $trade_no BEpusdt 交易 ID（作为 detection tx）
-     * @param string $buyer    付款方钱包地址
-     */
-    private static function _markDetected(array $order, string $trade_no, string $buyer): void
-    {
-        global $DB;
-
-        $ext = [];
-        if (!empty($order['ext'])) {
-            $decoded = @unserialize($order['ext']);
-            if (is_array($decoded)) {
-                $ext = $decoded;
+        try {
+            $event = BepusdtProtocol::parseCallback(
+                (string) file_get_contents('php://input'),
+                (string) ($channel['appkey'] ?? ''),
+                (string) TRADE_NO
+            );
+            if(!empty($order['api_trade_no']) && !hash_equals((string)$order['api_trade_no'], $event['trade_id'])){
+                throw new BepusdtProtocolException('回调网关订单号不匹配', 400);
             }
+
+            $disposition = BepusdtProtocol::callbackDisposition($event);
+            if ($disposition === 'settle') {
+                processNotify($order, $event['trade_id'], null, $event['block_transaction_id']);
+            } elseif ($disposition === 'timeout' && in_array((int)$order['status'], [0, 4], true)) {
+                \lib\Payment::mergeOrderExt((string) TRADE_NO, [
+                    'gateway_status' => 'timeout',
+                    'gateway_expired_at' => date('Y-m-d H:i:s'),
+                ]);
+            }
+
+            self::respond(200, 'ok');
+        } catch (BepusdtProtocolException $e) {
+            self::respond($e->getHttpStatus(), 'fail');
+        } catch (\Throwable $e) {
+            error_log('BEpusdt callback failed: ' . $e->getMessage());
+            self::respond(500, 'fail');
         }
-
-        // 若已记录 detected_at 则跳过，避免回调重试覆盖首个检测时间
-        if (!empty($ext['detected_at'])) {
-            return;
-        }
-
-        $ext['detected_at']    = date('Y-m-d H:i:s');
-        $ext['detected_tx']    = $trade_no;
-        $ext['detected_buyer'] = $buyer;
-
-        $DB->update('order', ['ext' => serialize($ext)], ['trade_no' => $order['trade_no']]);
     }
 
     public static function return(): array
@@ -320,60 +221,44 @@ class bepusdt_plugin
         return ['type' => 'page', 'page' => 'return'];
     }
 
-    /**
-     * 将 Epay 支付方式名称转为 BEpusdt 要求的 trade_type 格式（小写+点号）
-     * 如：usdt-polygon -> usdt.polygon, USDT-TRC20 -> usdt.trc20
-     */
-    private static function _normalizeTradeType(string $typename): string
+    private static function buildUnifiedPayInfo(array $payload, string $tradeType): array
     {
-        $t = strtolower(trim($typename));
-        $t = str_replace(['-', '_'], '.', $t);
-        return $t;
+        return [
+            'plugin' => 'bepusdt',
+            'address' => (string) $payload['token'],
+            'amount' => (string) $payload['actual_amount'],
+            'currency' => $tradeType,
+            'chain' => '',
+            'fiat' => 'CNY',
+            'fiat_amount' => (string) $payload['amount'],
+            'expire_at' => time() + (int) $payload['expiration_time'],
+            'qrcode' => '',
+            'fallback_url' => (string) $payload['payment_url'],
+            'api_trade_no' => (string) $payload['trade_id'],
+        ];
     }
 
-    private static function _toSign(array $parameter, string $token): string
+    private static function unifiedPageData(array $ext): array
     {
-        ksort($parameter);
-
-        $sign = '';
-
-        foreach ($parameter as $key => $val) {
-            if ($key === 'signature') continue;
-            // BEpusdt 规则：空值不参与签名（包括 null、空字符串、0）
-            if ($val === '' || $val === null) continue;
-            if ($val === 0 && $key !== 'amount') continue;
-
-            if ($sign !== '') {
-                $sign .= '&';
-            }
-            $sign .= $key . '=' . $val;
-        }
-
-        return md5($sign . $token);
+        return [
+            'pay_plugin' => 'BEpusdt',
+            'pay_address' => $ext['address'],
+            'pay_amount' => $ext['amount'],
+            'pay_currency' => $ext['currency'],
+            'pay_chain' => $ext['chain'],
+            'pay_fiat' => $ext['fiat'],
+            'pay_fiat_amount' => $ext['fiat_amount'],
+            'pay_expire_at' => (int) $ext['expire_at'],
+            'pay_qrcode' => $ext['qrcode'],
+            'pay_fallback_url' => $ext['fallback_url'],
+        ];
     }
 
-    private static function _post(string $url, array $json)
+    private static function respond(int $status, string $body): void
     {
-
-        $header[] = 'Accept: */*';
-        $header[] = 'Accept-Language: zh-CN,zh;q=0.8';
-        $header[] = 'Connection: close';
-        $header[] = 'Content-Type: application/json';
-
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, $url);
-        curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($json));
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, $header);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-        curl_setopt($ch, CURLOPT_HEADER, false);
-        $resp = curl_exec($ch);
-        curl_close($ch);
-
-        return json_decode($resp, true);
+        http_response_code($status);
+        header('Content-Type: text/plain; charset=utf-8');
+        exit($body);
     }
 }
 

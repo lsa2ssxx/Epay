@@ -10,9 +10,9 @@ if (!function_exists('pay_type_bepusdt_deep_order')) {
 	function pay_type_bepusdt_deep_order(): array
 	{
 		return [
-			'usdt.trc20', 'usdt.erc20', 'usdt.polygon', 'usdt.bep20', 'usdt.arbitrum', 'usdt.solana', 'usdt.aptos', 'usdt.xlayer', 'usdt.plasma',
+			'usdt.trc20', 'usdt.erc20', 'usdt.polygon', 'usdt.bep20', 'usdt.arbitrum', 'usdt.solana', 'usdt.aptos', 'usdt.xlayer', 'usdt.plasma', 'usdt.ton',
 			'usdc.trc20', 'usdc.erc20', 'usdc.polygon', 'usdc.bep20', 'usdc.arbitrum', 'usdc.base', 'usdc.solana', 'usdc.aptos', 'usdc.xlayer',
-			'tron.trx', 'ethereum.eth', 'bsc.bnb',
+			'tron.trx', 'ethereum.eth', 'bsc.bnb', 'ton.gram',
 		];
 	}
 

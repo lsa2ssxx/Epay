@@ -5,7 +5,7 @@ create table `pre_config` (
 PRIMARY KEY  (`k`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
-INSERT INTO `pre_config` VALUES ('version', '2057');
+INSERT INTO `pre_config` VALUES ('version', '2058');
 INSERT INTO `pre_config` VALUES ('admin_user', 'admin');
 INSERT INTO `pre_config` VALUES ('admin_pwd', '123456');
 INSERT INTO `pre_config` VALUES ('admin_paypwd', '123456');
@@ -99,12 +99,12 @@ CREATE TABLE `pre_type` (
  KEY `name` (`name`,`device`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
-INSERT INTO `pre_type` VALUES (1, 'alipay', 0, '支付宝', 1);
-INSERT INTO `pre_type` VALUES (2, 'wxpay', 0, '微信支付', 1);
-INSERT INTO `pre_type` VALUES (3, 'qqpay', 0, 'QQ钱包', 1);
-INSERT INTO `pre_type` VALUES (4, 'bank', 0, '网银支付', 0);
-INSERT INTO `pre_type` VALUES (5, 'jdpay', 0, '京东支付', 0);
-INSERT INTO `pre_type` VALUES (6, 'paypal', 0, 'PayPal', 0);
+INSERT INTO `pre_type` (`id`,`name`,`device`,`showname`,`status`) VALUES (1, 'alipay', 0, '支付宝', 1);
+INSERT INTO `pre_type` (`id`,`name`,`device`,`showname`,`status`) VALUES (2, 'wxpay', 0, '微信支付', 1);
+INSERT INTO `pre_type` (`id`,`name`,`device`,`showname`,`status`) VALUES (3, 'qqpay', 0, 'QQ钱包', 1);
+INSERT INTO `pre_type` (`id`,`name`,`device`,`showname`,`status`) VALUES (4, 'bank', 0, '网银支付', 0);
+INSERT INTO `pre_type` (`id`,`name`,`device`,`showname`,`status`) VALUES (5, 'jdpay', 0, '京东支付', 0);
+INSERT INTO `pre_type` (`id`,`name`,`device`,`showname`,`status`) VALUES (6, 'paypal', 0, 'PayPal', 0);
 
 DROP TABLE IF EXISTS `pre_plugin`;
 CREATE TABLE `pre_plugin` (
@@ -112,8 +112,8 @@ CREATE TABLE `pre_plugin` (
   `showname` varchar(60) DEFAULT NULL,
   `author` varchar(60) DEFAULT NULL,
   `link` varchar(255) DEFAULT NULL,
-  `types` varchar(255) DEFAULT NULL,
-  `transtypes` varchar(50) DEFAULT NULL,
+  `types` varchar(500) DEFAULT NULL,
+  `transtypes` varchar(500) DEFAULT NULL,
  PRIMARY KEY (`name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 

@@ -6,6 +6,9 @@ if (!function_exists('pay_type_icon_src')) {
 	function pay_type_icon_src($typename)
 	{
 		$safe = preg_replace('/[^A-Za-z0-9._\-]/', '', (string) $typename);
+		if ($safe === 'ton.gram') {
+			return '/assets/icon/ton.gram.svg';
+		}
 
 		return '/assets/icon/' . $safe . '.ico';
 	}
@@ -26,6 +29,7 @@ if (!function_exists('pay_type_icon_src')) {
 			'xlayer' => '/assets/icon/chain/xlayer.png',
 			'base' => '/assets/icon/chain/base.png',
 			'plasma' => '/assets/icon/chain/plasma.png',
+			'ton' => '/assets/icon/chain/ton.svg',
 		];
 	}
 
@@ -50,6 +54,7 @@ if (!function_exists('pay_type_icon_src')) {
 			'xlayer' => ['label' => 'XL', 'bg' => '#2d2d2d'],
 			'base' => ['label' => 'BAS', 'bg' => '#0052FF'],
 			'plasma' => ['label' => 'PLM', 'bg' => '#6B46C1'],
+			'ton' => ['label' => 'TON', 'bg' => '#0098EA'],
 		];
 		if (isset($map[$chain])) {
 			$b = $map[$chain];

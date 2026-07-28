@@ -28,6 +28,7 @@ if (!function_exists('pay_type_category_currency_meta')) {
 			'POL'     => ['name' => 'Polygon',   'icon' => 'polygon.pol',  'kind' => 'crypto', 'sort' => 16],
 			'SOL'     => ['name' => 'Solana',    'icon' => 'solana.sol',   'kind' => 'crypto', 'sort' => 17],
 			'APT'     => ['name' => 'Aptos',     'icon' => 'aptos.apt',    'kind' => 'crypto', 'sort' => 18],
+			'GRAM'    => ['name' => 'GRAM',      'icon' => 'ton.gram',     'kind' => 'crypto', 'sort' => 19],
 			'Alipay'  => ['name' => '支付宝',    'icon' => 'alipay',       'kind' => 'fiat',   'sort' => 80],
 			'WeChat'  => ['name' => '微信支付',  'icon' => 'wxpay',        'kind' => 'fiat',   'sort' => 81],
 			'QQ'      => ['name' => 'QQ 钱包',   'icon' => 'qqpay',        'kind' => 'fiat',   'sort' => 82],
@@ -84,6 +85,7 @@ if (!function_exists('pay_type_category_currency_meta')) {
 				'polygon.pol'   => 'POL',
 				'solana.sol'    => 'SOL',
 				'aptos.apt'     => 'APT',
+				'ton.gram'      => 'GRAM',
 				'btc.btc'       => 'BTC',
 			];
 			if (isset($native[$n])) {
@@ -95,8 +97,8 @@ if (!function_exists('pay_type_category_currency_meta')) {
 		}
 
 		// 3) BEpusdt/TokenPay 风格：USDT_TRC20、USDC_POLYGON、EVM_ETH_USDT_ERC20、EVM_BSC_BNB ...
-		$tokens = ['USDT', 'USDC', 'DAI', 'BTC', 'ETH', 'TRX', 'BNB', 'POL', 'SOL', 'APT'];
-		$chains = ['TRC20', 'ERC20', 'BEP20', 'POLYGON', 'BSC', 'ARBITRUM', 'SOLANA', 'APTOS', 'XLAYER', 'BASE', 'PLASMA', 'TRON', 'ETHEREUM'];
+		$tokens = ['USDT', 'USDC', 'DAI', 'BTC', 'ETH', 'TRX', 'BNB', 'POL', 'SOL', 'APT', 'GRAM'];
+		$chains = ['TRC20', 'ERC20', 'BEP20', 'POLYGON', 'BSC', 'ARBITRUM', 'SOLANA', 'APTOS', 'XLAYER', 'BASE', 'PLASMA', 'TON', 'TRON', 'ETHEREUM'];
 		$rawU = strtoupper($raw);
 		$foundToken = null;
 		$foundChain = null;
@@ -193,6 +195,7 @@ if (!function_exists('pay_type_category_currency_meta')) {
 			'ARBITRUM' => 50,
 			'BASE'     => 60,
 			'SOLANA'   => 70,
+			'TON'      => 75,
 			'APTOS'    => 80,
 			'XLAYER'   => 90,
 			'PLASMA'   => 95,
