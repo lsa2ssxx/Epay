@@ -94,8 +94,8 @@ class PayApp
 		$url = self::GATEWAY . $path;
 		$ch = curl_init();
 		curl_setopt($ch, CURLOPT_URL, $url);
-		curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-		curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+		curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+		curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
 		$httpheader[] = "Accept: */*";
 		$httpheader[] = "Accept-Encoding: gzip,deflate";
 		$httpheader[] = "Accept-Language: zh-CN,zh;q=0.9";

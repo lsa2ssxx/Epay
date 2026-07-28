@@ -7,6 +7,7 @@ $login_limit_count = 5;//登录失败次数
 $login_limit_file = '@login.lock';
 
 if(!function_exists("imagecreate") || !file_exists('code.php'))$verifycode=0;
+define('IN_ADMIN_LOGIN', true);
 include("../includes/common.php");
 
 if(isset($_GET['act']) && $_GET['act']=='login'){

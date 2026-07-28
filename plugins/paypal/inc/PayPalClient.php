@@ -65,6 +65,62 @@ class PayPalClient
         return $this->curl($this->gateway_url . $path);
     }
 
+    public static function isAllowedWebhookCertificateUrl($url)
+    {
+        if(!is_string($url) || $url === '' || strlen($url) > 500){
+            return false;
+        }
+
+        $parts = parse_url($url);
+        if($parts === false || !isset($parts['scheme'], $parts['host'], $parts['path'])){
+            return false;
+        }
+        if(strtolower($parts['scheme']) !== 'https' || isset($parts['user']) || isset($parts['pass']) ||
+            isset($parts['port']) || isset($parts['query']) || isset($parts['fragment'])){
+            return false;
+        }
+
+        $allowedHosts = [
+            'api.paypal.com',
+            'api-m.paypal.com',
+            'api.sandbox.paypal.com',
+            'api-m.sandbox.paypal.com',
+        ];
+        if(!in_array(strtolower($parts['host']), $allowedHosts, true)){
+            return false;
+        }
+
+        return preg_match('#^/v1/notifications/certs/[A-Za-z0-9._-]+$#D', $parts['path']) === 1;
+    }
+
+    public function verifyWebhookSignature(array $headers, $webhookId, array $event)
+    {
+        $required = ['auth_algo', 'cert_url', 'transmission_id', 'transmission_sig', 'transmission_time'];
+        foreach($required as $key){
+            if(!isset($headers[$key]) || !is_string($headers[$key]) || $headers[$key] === ''){
+                throw new InvalidArgumentException('PayPal webhook签名参数不完整');
+            }
+        }
+        if(!self::isAllowedWebhookCertificateUrl($headers['cert_url'])){
+            throw new InvalidArgumentException('PayPal webhook证书地址不可信');
+        }
+        if(!is_string($webhookId) || $webhookId === ''){
+            throw new InvalidArgumentException('PayPal webhook ID未配置');
+        }
+
+        $payload = [
+            'auth_algo' => $headers['auth_algo'],
+            'cert_url' => $headers['cert_url'],
+            'transmission_id' => $headers['transmission_id'],
+            'transmission_sig' => $headers['transmission_sig'],
+            'transmission_time' => $headers['transmission_time'],
+            'webhook_id' => $webhookId,
+            'webhook_event' => $event,
+        ];
+        $result = $this->curl($this->gateway_url.'/v1/notifications/verify-webhook-signature', $payload);
+        return isset($result['verification_status']) && $result['verification_status'] === 'SUCCESS';
+    }
+
     private function curl($url, $data = null, $auth = false)
     {
         $header[] = 'Accept: application/json';
@@ -84,8 +140,8 @@ class PayPalClient
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_FAILONERROR, false);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
         if($data !== null){
             curl_setopt($ch, CURLOPT_POST, true);
             curl_setopt($ch, CURLOPT_POSTFIELDS, $data);

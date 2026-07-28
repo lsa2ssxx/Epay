@@ -55,8 +55,8 @@ class qq_qrlogin{
 	private function get_curl($url,$post=0,$referer=0,$cookie=0,$header=0,$ua=0,$nobaody=0,$split=0){
 		$ch = curl_init();
 		curl_setopt($ch, CURLOPT_URL,$url);
-		curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-		curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+		curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+		curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
 		$httpheader[] = "Accept: application/json";
 		$httpheader[] = "Accept-Encoding: gzip,deflate,sdch";
 		$httpheader[] = "Accept-Language: zh-CN,zh;q=0.8";

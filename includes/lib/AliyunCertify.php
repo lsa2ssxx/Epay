@@ -83,8 +83,8 @@ class AliyunCertify {
 		$data=array_merge($data, $param);
 		$data['Signature'] = $this->aliyunSignature($data, $this->AccessKeySecret, 'POST');
 		$ch=curl_init($url);
-		curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-		curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+		curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+		curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
 		curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 		curl_setopt($ch, CURLOPT_TIMEOUT, 30);
 		curl_setopt($ch, CURLOPT_POST, 1);

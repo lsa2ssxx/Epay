@@ -169,20 +169,23 @@ class paypal_plugin
 			exit('未配置webhookid');
 		}
 
-		$crc32 = crc32($json);
-        if (empty($_SERVER['HTTP_PAYPAL_TRANSMISSION_ID']) || empty($_SERVER['HTTP_PAYPAL_TRANSMISSION_TIME']) || empty($crc32)) {
-			exit('签名数据为空');
-        }
-        $sign_string = $_SERVER['HTTP_PAYPAL_TRANSMISSION_ID'].'|'.$_SERVER['HTTP_PAYPAL_TRANSMISSION_TIME'].'|'.$channel['appsecret'].'|'.$crc32;
-
-        // 通过PAYPAL-CERT-URL头信息去拿公钥
-        $public_key = openssl_pkey_get_public(get_curl($_SERVER['HTTP_PAYPAL_CERT_URL']));
-        $details = openssl_pkey_get_details($public_key);
-        $verify = openssl_verify($sign_string, base64_decode($_SERVER['HTTP_PAYPAL_TRANSMISSION_SIG']), $details['key'], 'SHA256');
-        if($verify != 1)
-        {
+		$headers = [
+			'auth_algo' => isset($_SERVER['HTTP_PAYPAL_AUTH_ALGO']) ? $_SERVER['HTTP_PAYPAL_AUTH_ALGO'] : '',
+			'cert_url' => isset($_SERVER['HTTP_PAYPAL_CERT_URL']) ? $_SERVER['HTTP_PAYPAL_CERT_URL'] : '',
+			'transmission_id' => isset($_SERVER['HTTP_PAYPAL_TRANSMISSION_ID']) ? $_SERVER['HTTP_PAYPAL_TRANSMISSION_ID'] : '',
+			'transmission_sig' => isset($_SERVER['HTTP_PAYPAL_TRANSMISSION_SIG']) ? $_SERVER['HTTP_PAYPAL_TRANSMISSION_SIG'] : '',
+			'transmission_time' => isset($_SERVER['HTTP_PAYPAL_TRANSMISSION_TIME']) ? $_SERVER['HTTP_PAYPAL_TRANSMISSION_TIME'] : '',
+		];
+		require_once(PAY_ROOT."inc/PayPalClient.php");
+		try{
+			$client = new PayPalClient($channel['appid'], $channel['appkey'], $channel['appswitch']);
+			$verified = $client->verifyWebhookSignature($headers, $channel['appsecret'], $arr);
+		}catch(Exception $e){
 			exit('签名验证失败');
-        }
+		}
+		if(!$verified){
+			exit('签名验证失败');
+		}
 
 		$resource = $arr['resource'];
 		$amount = $resource['amount']['value'];

@@ -113,8 +113,8 @@ class QC{
     public function get_curl($url){
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL,$url);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
         curl_setopt($ch, CURLOPT_USERAGENT,'Mozilla/5.0 (Linux; U; Android 4.4.1; zh-cn) AppleWebKit/533.1 (KHTML, like Gecko)Version/4.0 MQQBrowser/5.5 Mobile Safari/533.1');
         curl_setopt($ch, CURLOPT_RETURNTRANSFER,1);
         $ret = curl_exec($ch);

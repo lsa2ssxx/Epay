@@ -39,8 +39,8 @@ class AlipayGlobalClient
             curl_setopt($ch, CURLOPT_URL, $requestUrl);
             curl_setopt($ch, CURLOPT_FAILONERROR, false);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
             $response = curl_exec($ch);
             if (curl_errno($ch) > 0) {
                 $errmsg = curl_error($ch);
@@ -189,8 +189,8 @@ class AlipayGlobalClient
 	private function curl($url, $post = false, $timeout = 10){
 		$ch = curl_init($url);
 		curl_setopt($ch, CURLOPT_TIMEOUT, $timeout);
-		curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-		curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+		curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+		curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
 		$httpheader[] = "Accept: */*";
 		$httpheader[] = "Accept-Language: zh-CN,zh;q=0.8";
 		$httpheader[] = "Connection: close";

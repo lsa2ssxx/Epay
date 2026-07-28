@@ -70,7 +70,7 @@ if(!$conf['localurl'])$conf['localurl'] = $siteurl;
 $password_hash='!@#%!s!0';
 
 if ($conf['version'] < DB_VERSION) {
-    if (!$install) {
+    if (empty($install) && !defined('IN_DB_UPGRADE') && !defined('IN_ADMIN_LOGIN')) {
 		header('Content-type:text/html;charset=utf-8');
         echo '请先完成网站升级！<a href="/install/update.php"><font color=red>点此升级</font></a>';
         exit;

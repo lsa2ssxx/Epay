@@ -1,9 +1,34 @@
 <?php
 error_reporting(0);
-define('DB_VERSION', '2058');
-require '../config.php';
+define('IN_DB_UPGRADE', true);
+require '../includes/common.php';
 
 @header('Content-Type: text/html; charset=UTF-8');
+
+if(!isset($islogin) || $islogin !== 1){
+	http_response_code(403);
+	exit('请先登录管理后台，再执行数据库升级。');
+}
+
+if($_SERVER['REQUEST_METHOD'] !== 'POST'){
+	$_SESSION['db_upgrade_token'] = bin2hex(random_bytes(32));
+	$token = htmlspecialchars($_SESSION['db_upgrade_token'], ENT_QUOTES, 'UTF-8');
+	echo '<h2>数据库升级确认</h2>';
+	echo '<p>升级前请先备份数据库。此操作仅允许已登录的管理员执行。</p>';
+	echo '<form method="post">';
+	echo '<input type="hidden" name="token" value="'.$token.'">';
+	echo '<button type="submit">确认执行升级</button>';
+	echo '</form>';
+	exit;
+}
+
+$submittedToken = isset($_POST['token']) ? (string)$_POST['token'] : '';
+$sessionToken = isset($_SESSION['db_upgrade_token']) ? (string)$_SESSION['db_upgrade_token'] : '';
+if($sessionToken === '' || !hash_equals($sessionToken, $submittedToken)){
+	http_response_code(403);
+	exit('升级请求校验失败，请返回升级页面后重试。');
+}
+unset($_SESSION['db_upgrade_token']);
 
 try{
 	$db=new PDO("mysql:host=".$dbconfig['host'].";dbname=".$dbconfig['dbname'].";port=".$dbconfig['port'],$dbconfig['user'],$dbconfig['pwd']);

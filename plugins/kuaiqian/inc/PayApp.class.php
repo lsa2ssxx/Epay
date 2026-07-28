@@ -217,7 +217,7 @@ class PayApp
 		curl_setopt($ch, CURLOPT_POSTFIELDS, $str);
 		curl_setopt($ch, CURLOPT_USERAGENT, "Mozilla/4.0 (compatible; MSIE 5.01; Windows NT 5.0)");
 		curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-		curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+		curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
 		curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
 		curl_setopt($ch, CURLOPT_SSLCERTTYPE, 'P12');
 		curl_setopt($ch, CURLOPT_SSLCERT, $this->ssl_cert_path);
@@ -252,8 +252,8 @@ class PayApp
 		curl_setopt($ch, CURLOPT_POSTFIELDS, $body);
 		curl_setopt($ch, CURLOPT_USERAGENT, "Mozilla/5.0 (Linux; Android 12; M2011K2C Build/SKQ1.211006.001) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/95.0.4638.74 Mobile Safari/537.36");
 		curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-		curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-		curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+		curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+		curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
 		curl_setopt($ch, CURLOPT_ENCODING, "gzip");
 		if ($cookie) {
 			curl_setopt($ch, CURLOPT_COOKIE, $cookie);

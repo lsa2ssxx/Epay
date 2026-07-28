@@ -217,7 +217,7 @@ class jfyui_plugin {
 			}
 		}
 		curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-		curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+		curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
 		$response = curl_exec($ch);
 		curl_close($ch);
 		return json_decode($response, true);
